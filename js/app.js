@@ -3010,21 +3010,23 @@ async function hPts(el, p) {
   if (S.hal !== 'pts') return;
   const semuaMapel = d.mapel.concat(d.mapelAik || []);
   S.ui.T = {
-    id, d, versi: d.versi, tab: p.tab || S.ui.tabPts || 'input', pilihan, kotor: false, ak: null,
+    id, d, versi: d.versi, tab: p.tab || S.ui.tabPts || 'input', pilihan, kotor: false, kotorNilai: false, ak: null,
     baris: d.baris.map(b => {
       const o = { id_siswa: b.id_siswa, no: b.no, nisn: b.nisn, nama: b.nama, sakit: b.sakit, izin: b.izin, alpa: b.alpa, catatan: b.catatan,
         nilaiIsi: semuaMapel.filter(m => b.nilai[m.id_mapel] !== undefined && b.nilai[m.id_mapel] !== '').length, nilaiTotal: semuaMapel.length };
-      d.mapel.forEach(m => { o['m_' + m.id_mapel] = b.nilai[m.id_mapel] === undefined ? '' : String(b.nilai[m.id_mapel]); });
+      d.mapel.forEach(m => { const cp = b.cp && Array.isArray(b.cp[m.id_mapel]) ? b.cp[m.id_mapel] : []; o['m_' + m.id_mapel] = b.nilai[m.id_mapel] === undefined ? '' : String(b.nilai[m.id_mapel]); o['t_' + m.id_mapel] = String(cp[0] || ''); o['r_' + m.id_mapel] = String(cp[1] || ''); });
       return o;
     })
   };
+  S.ui.T.nilaiAsli = {};
+  S.ui.T.baris.forEach(b => { const a = S.ui.T.nilaiAsli[b.id_siswa] = {}; d.mapel.forEach(m => { ['m_', 't_', 'r_'].forEach(p => { a[p + m.id_mapel] = b[p + m.id_mapel]; }); }); });
   renderPts(el);
 }
 
 function tandaiPts() {
   const T = S.ui.T;
   if (!T) return;
-  const bag = (T.kotor ? ['kehadiran & catatan'] : []).concat(T.ak ? Object.keys(T.ak.kotor).filter(k => T.ak.kotor[k]) : []);
+  const bag = (T.kotor ? ['kehadiran & catatan'] : []).concat(T.kotorNilai ? ['nilai mapel'] : []).concat(T.ak ? Object.keys(T.ak.kotor).filter(k => T.ak.kotor[k]) : []);
   tandaiKotor(bag.length ? `Data tengah semester (${bag.join(', ')}) belum disimpan.` : null);
 }
 function renderPts(el) {
@@ -3035,13 +3037,14 @@ function renderPts(el) {
       (S.set.tanggal_rapor_pts ? `<span class="pill p-mint">${ic('calendar-event')} Titimangsa ${fmt.tgl(S.set.tanggal_rapor_pts, true)}<\x2fspan>` : `<span class="pill p-butter">${ic('calendar-x')} Tanggal rapor PTS belum diatur${S.me.isSA ? ' \u2014 atur di Pengaturan' : ''}<\x2fspan>`) +
       (d.revisiWali ? '<span class="pill p-butter">Mode revisi wali kelas<\x2fspan>' : '') + (d.readOnly ? `<span class="pill p-peach">${ic('lock-fill')} Hanya lihat<\x2fspan>` : ''),
     aksi: `${S.me.isSA ? `<button class="btn btn-out" data-aksi="imporLeger" data-t="pts">${ic('file-earmark-spreadsheet')} Impor leger Excel<\x2fbutton>` : ''}${T.pilihan.length > 1 ? `<select class="in" style="width:auto" id="ptsKelas" aria-label="Pilih kelas">${opsi(T.pilihan.map(x => [x.id_kelas, x.nama_kelas]), T.id)}<\x2fselect>` : ''}
-      <div class="tabs" role="tablist">${[['input', 'calendar-check', 'Kehadiran & Catatan'], ['aktivitas', 'trophy', 'Kokurikuler & Ekskul'], ['cetak', 'printer', 'Cetak rapor PTS']].map(t => `<button role="tab" class="${T.tab === t[0] ? 'aktif' : ''}" data-aksi="tabPts" data-t="${t[0]}">${ic(t[1])} ${t[2]}<\x2fbutton>`).join('')}<\x2fdiv>`
+      <div class="tabs" role="tablist">${[['input', 'calendar-check', 'Kehadiran & Catatan'], ['aktivitas', 'trophy', 'Kokurikuler & Ekskul'], ['nilai', 'pencil-square', d.revisiWali ? 'Revisi Nilai Mapel' : 'Nilai Mapel'], ['cetak', 'printer', 'Cetak rapor PTS']].map(t => `<button role="tab" class="${T.tab === t[0] ? 'aktif' : ''}" data-aksi="tabPts" data-t="${t[0]}">${ic(t[1])} ${t[2]}<\x2fbutton>`).join('')}<\x2fdiv>`
   }) + '<div id="ptsIsi"><\x2fdiv>';
   const sel = $('#ptsKelas', el);
   if (sel) sel.addEventListener('change', () => { buka('pts', { id_kelas: sel.value, tab: T.tab }).then(() => { const x = $('#ptsKelas'); if (x && S.ui.T) x.value = S.ui.T.id; }); });
   pasangAktivitas($('#ptsIsi', el));
   if (T.tab === 'input') renderPtsInput();
   else if (T.tab === 'aktivitas') { S.ui.AK = konteksAktivitasPts(); renderAktivitas(); }
+  else if (T.tab === 'nilai') renderPtsNilai();
   else renderPtsCetak();
 }
 function renderPtsInput() {
@@ -3110,11 +3113,110 @@ async function simpanPtsJenis(jenis, btn, baris) {
         throw new ApiGalat(r);
       }
       T.versi = r.data.versi; T.d.terakhir = { oleh: S.me.nama, waktu: r.data.waktu }; Cache.hapus('pts_', 'phtml_');
-      if (jenis === 'absensi') T.kotor = false; else T.ak.kotor[jenis] = false;
+      if (jenis === 'absensi') T.kotor = false; else if (jenis === 'nilai') ptsNilaiTersimpan(); else T.ak.kotor[jenis] = false;
       tandaiPts(); toast(r.pesan);
+      if (jenis === 'nilai') { const sub = $('#ptsNSub'); if (sub) sub.textContent = `Terakhir diubah ${S.me.nama}, baru saja`; statNilai(); }
       if (jenis === 'absensi') { const sub = $('#ptsSub'); if (sub) sub.textContent = `Terakhir diubah ${S.me.nama}, baru saja`; statPts(); }
     } catch (e) { galat(e); }
   }, 'Menyimpan\u2026');
+}
+const PTS_BIDANG = [['m_', 'nilai'], ['t_', 'cpt'], ['r_', 'cpr']];
+const ptsIsiSel = (p, v) => { const x = String(v === undefined || v === null ? '' : v).trim(); return p !== 'm_' && x === '-' ? '' : x; };
+function ptsNilaiPerubahan() {
+  const T = S.ui.T, d = T.d, hasil = [];
+  T.baris.forEach(b => {
+    const asli = T.nilaiAsli[b.id_siswa] || {}, o = { id_siswa: b.id_siswa };
+    let ada = false;
+    d.mapel.forEach(m => PTS_BIDANG.forEach(([p, nama]) => {
+      const k = p + m.id_mapel, skrg = ptsIsiSel(p, b[k]), dulu = ptsIsiSel(p, asli[k]);
+      if (skrg !== dulu) { (o[nama] = o[nama] || {})[m.id_mapel] = { dari: dulu, ke: skrg }; ada = true; }
+    }));
+    if (ada) hasil.push(o);
+  });
+  return hasil;
+}
+const ptsNilaiJumlah = () => ptsNilaiPerubahan().reduce((a, b) => a + PTS_BIDANG.reduce((x, p) => x + Object.keys(b[p[1]] || {}).length, 0), 0);
+const ptsNilaiTakValid = () => ptsNilaiPerubahan().reduce((a, b) => a + Object.values(b.nilai || {}).filter(x => x.ke !== '' && !(/^\d+$/.test(x.ke) && +x.ke <= 100)).length +
+  ['cpt', 'cpr'].reduce((y, k) => y + Object.values(b[k] || {}).filter(x => x.ke.length > 600).length, 0), 0);
+function ptsNilaiTersimpan() {
+  const T = S.ui.T, d = T.d, perSiswa = {};
+  d.baris.forEach(x => { perSiswa[x.id_siswa] = x; });
+  T.baris.forEach(b => {
+    const asli = T.nilaiAsli[b.id_siswa] = T.nilaiAsli[b.id_siswa] || {}, dasar = perSiswa[b.id_siswa];
+    d.mapel.forEach(m => {
+      PTS_BIDANG.forEach(([p]) => { const k = p + m.id_mapel; b[k] = ptsIsiSel(p, b[k]); asli[k] = b[k]; });
+      if (!dasar) return;
+      const v = b['m_' + m.id_mapel], t = b['t_' + m.id_mapel], r = b['r_' + m.id_mapel];
+      if (v === '') delete dasar.nilai[m.id_mapel]; else dasar.nilai[m.id_mapel] = Number(v);
+      dasar.cp = dasar.cp || {};
+      if (!t && !r) delete dasar.cp[m.id_mapel]; else dasar.cp[m.id_mapel] = [t, r];
+    });
+    if (dasar) b.nilaiIsi = d.mapel.concat(d.mapelAik || []).filter(m => dasar.nilai[m.id_mapel] !== undefined && dasar.nilai[m.id_mapel] !== '').length;
+  });
+  T.kotorNilai = false;
+}
+function renderPtsNilai() {
+  const T = S.ui.T, d = T.d, kd = m => String(m.kode || '').trim() || String(m.nama_mapel).slice(0, 10);
+  if (!d.mapel.length) { $('#ptsIsi').innerHTML = `<div class="card">${kosong('Belum ada mapel', 'Kelas ini belum memiliki mata pelajaran pada semester aktif.', '', 'journal-bookmark')}<\x2fdiv>`; return; }
+  if (!T.modeNilai) T.modeNilai = 'semua';
+  if (!d.mapel.some(m => m.id_mapel === T.mapelNilai)) T.mapelNilai = d.mapel[0].id_mapel;
+  const perMapel = T.modeNilai === 'mapel', mp = d.mapel.filter(m => m.id_mapel === T.mapelNilai)[0];
+  const pesanMode = perMapel
+    ? `Kolom <b>CP Tinggi<\x2fb> dan <b>CP Rendah<\x2fb> dicetak di rapor PTS. Tempel dari Excel: klik sel Nilai siswa nomor 1, lalu <kbd>Ctrl<\x2fkbd>+<kbd>V<\x2fkbd> &mdash; urutan kolom <b>Nilai, CP Tinggi, CP Rendah<\x2fb>.`
+    : `Tampilan ini untuk nilai saja; untuk merevisi <b>capaian (CP)<\x2fb>, pilih tampilan <b>Per mapel<\x2fb>.`;
+  const pesanFormat = d.formatCp ? '' : `<div class="al al-warn mt2">${ic('info-circle')}<div>Format rapor tengah semester sekolah saat ini <b>Keterangan (Tuntas\x2fBelum tuntas)<\x2fb>: capaian (CP) tidak tercetak di rapor PTS.<\x2fdiv><\x2fdiv>`;
+  const alat = `<div class="row" style="gap:10px;flex-wrap:wrap"><div class="seg">${[['semua', 'Semua mapel (nilai)'], ['mapel', 'Per mapel (nilai + CP)']].map(x => `<button class="${T.modeNilai === x[0] ? 'aktif' : ''}" data-aksi="ptsNilaiMode" data-m="${x[0]}">${x[1]}<\x2fbutton>`).join('')}<\x2fdiv>${perMapel ? `<select class="in" style="width:auto;max-width:440px" id="ptsNMapel" aria-label="Pilih mapel">${opsi(d.mapel.map(m => [m.id_mapel, kd(m) + ' \u2014 ' + m.nama_mapel]), T.mapelNilai)}<\x2fselect>` : ''}<\x2fdiv>`;
+  $('#ptsIsi').innerHTML = `<div class="card mb3"><div class="row between" style="align-items:stretch">
+      <div class="al al-info grow" style="max-width:820px">${ic('pencil-square')}<div>${d.revisiWali ? '<b>Mode revisi wali kelas.<\x2fb> Perbaiki nilai dan capaian mapel tengah semester bila ada kesalahan.' : 'Nilai dan capaian mapel tengah semester.'} <b>Hanya sel yang Anda ubah yang disimpan<\x2fb> dan setiap perubahan tercatat di Log Aktivitas. Sel nilai di bawah KKM diberi warna. ${pesanMode} Mapel AIK tidak berubah di sini.<\x2fdiv><\x2fdiv>
+      <div class="row">${d.readOnly ? '' : `<button class="btn btn-out" data-aksi="ptsNilaiBatal">${ic('arrow-counterclockwise')} Batalkan perubahan<\x2fbutton><button class="btn btn-dark" data-aksi="ptsNilaiSimpan">${ic('floppy')} Simpan revisi nilai<\x2fbutton>`}<\x2fdiv><\x2fdiv>${pesanFormat}
+      <div class="mt3">${alat}<\x2fdiv>${perMapel ? '' : `<div class="xs muted mt2">${d.mapel.map(m => `<b>${h(kd(m))}<\x2fb> = ${h(m.nama_mapel)}`).join(' &middot; ')}<\x2fdiv>`}<\x2fdiv>
+    <div class="card p0"><div class="card-h" style="padding:16px 20px 0"><div><h3>${perMapel ? h(mp.nama_mapel) : 'Nilai mapel tengah semester'} \u2014 ${h(singkat(d.kelas.nama_kelas))}<\x2fh3><p id="ptsNSub">${d.terakhir ? `Terakhir diubah ${h(d.terakhir.oleh)}, ${fmt.rel(d.terakhir.waktu)}` : 'Belum pernah disimpan'}<\x2fp><\x2fdiv><span class="pill" id="ptsNSt"><\x2fspan><\x2fdiv><div id="ptsNGrid" style="padding:16px 20px 20px"><\x2fdiv><\x2fdiv>
+    <div class="g c4 mt3" id="ptsNStat"><\x2fdiv>`;
+  const dasar = [
+    { k: 'no', label: 'No', tipe: 'mono', w: 46, stk: true },
+    { k: 'nama', label: 'Nama siswa', tipe: 'ro', w: 220, stk: true, tampil: b => `<span style="font-weight:600">${h(b.nama)}<\x2fspan>` }
+  ];
+  T.sheetN = new Sheet($('#ptsNGrid'), {
+    ro: d.readOnly, baris: T.baris,
+    kolom: perMapel
+      ? dasar.concat([
+        { k: 'm_' + mp.id_mapel, label: `Nilai PTS <span class="xs">(KKM ${mp.kkm})<\x2fspan>`, labelPendek: 'Nilai PTS', tipe: 'nilai', w: 108, kkm: mp.kkm },
+        { k: 't_' + mp.id_mapel, label: 'CP Tinggi (capaian tertinggi)', labelPendek: 'CP tinggi', tipe: 'teks', maks: 600, w: 310 },
+        { k: 'r_' + mp.id_mapel, label: 'CP Rendah (perlu peningkatan)', labelPendek: 'CP rendah', tipe: 'teks', maks: 600, w: 310 }])
+      : dasar.concat(d.mapel.map(m => ({ k: 'm_' + m.id_mapel, label: `<span title="${h(m.nama_mapel)}">${h(kd(m))}<\x2fspan><br><span class="xs">KKM ${m.kkm}<\x2fspan>`, labelPendek: m.nama_mapel, tipe: 'nilai', w: 92, kkm: m.kkm }))),
+    saatUbah: () => { T.kotorNilai = ptsNilaiJumlah() > 0; tandaiPts(); statNilai(); },
+    saatTempel: i => toast(ringkasTempel(i), i.galat ? 'warn' : 'ok', 6000)
+  });
+  const pm = $('#ptsNMapel');
+  if (pm) pm.addEventListener('change', () => { T.mapelNilai = pm.value; renderPtsNilai(); });
+  S.ui.simpanCepat = () => { const b = $('[data-aksi="ptsNilaiSimpan"]'); if (b) AKSI.ptsNilaiSimpan(b); };
+  statNilai();
+}
+function statNilai() {
+  const T = S.ui.T, d = T.d, n = T.baris.length, st = $('#ptsNSt');
+  if (!st) return;
+  const perMapel = T.modeNilai === 'mapel', daftar = perMapel ? d.mapel.filter(m => m.id_mapel === T.mapelNilai) : d.mapel;
+  let lengkap = 0, bawah = 0, cpLengkap = 0;
+  T.baris.forEach(b => {
+    let isi = 0;
+    daftar.forEach(m => {
+      const v = b['m_' + m.id_mapel];
+      if (v !== '' && v !== undefined) { isi++; if (Number(v) < m.kkm) bawah++; }
+      if (ptsIsiSel('t_', b['t_' + m.id_mapel]) && ptsIsiSel('r_', b['r_' + m.id_mapel])) cpLengkap++;
+    });
+    if (daftar.length && isi >= daftar.length) lengkap++;
+  });
+  const ubah = ptsNilaiJumlah(), g = T.sheetN ? T.sheetN.galat().length : 0;
+  $('#ptsNStat').innerHTML = [
+    kpi({ ikon: 'file-earmark-spreadsheet', tone: 'mint', v: `${lengkap}\x2f${n}`, l: perMapel ? 'Siswa dengan nilai terisi' : 'Siswa dengan nilai lengkap', s: lengkap >= n && n ? 'Semua siswa lengkap' : `${n - lengkap} siswa belum lengkap`, sCls: lengkap >= n && n ? 'c-ok' : 'c-warn' }),
+    perMapel
+      ? kpi({ ikon: 'card-text', tone: 'lav', v: `${cpLengkap}\x2f${n}`, l: 'CP tinggi & rendah terisi', s: cpLengkap >= n && n ? 'Lengkap' : `${n - cpLengkap} siswa belum lengkap`, sCls: cpLengkap >= n && n ? 'c-ok' : 'c-warn' })
+      : kpi({ ikon: 'exclamation-diamond', tone: 'butter', v: bawah, l: 'Nilai di bawah KKM', s: 'Sel bertanda warna di tabel' }),
+    kpi({ ikon: 'pencil', tone: 'lav', v: ubah, l: 'Perubahan belum disimpan', s: ubah ? 'Klik Simpan revisi nilai' : 'Tidak ada perubahan', sCls: ubah ? 'c-warn' : 'c-ok' }),
+    kpi({ ikon: g ? 'exclamation-triangle' : 'shield-check', tone: g ? 'danger' : 'mint', v: g ? `${g} galat` : 'Valid', l: 'Verifikasi input', sCls: g ? 'c-err' : 'c-ok' })
+  ].join('');
+  st.className = 'pill ' + (ubah ? 'p-butter' : 'p-mint');
+  st.innerHTML = ubah ? `${ic('pencil')} ${ubah} sel belum disimpan` : `${ic('check-circle-fill')} Tersimpan`;
 }
 function renderPtsCetak() {
   const T = S.ui.T, d = T.d;
@@ -3124,7 +3226,7 @@ function renderPtsCetak() {
     return Object.assign({ isi: v.length, jml, rata: v.length ? jml / v.length : null, lengkap: ptsLengkap(T, b) }, b);
   });
   rows.slice().sort((a, b) => b.jml - a.jml).forEach((r, i, arr) => { r.peringkat = i > 0 && arr[i - 1].jml === r.jml ? arr[i - 1].peringkat : i + 1; });
-  $('#ptsIsi').innerHTML = `<div class="card mb3 row between"><div class="sm grow" style="min-width:260px">${T.kotor || (T.ak && Object.values(T.ak.kotor).some(Boolean)) ? `<span class="c-warn b">${ic('exclamation-triangle')} Ada perubahan data tengah semester yang belum disimpan \u2014 simpan dulu agar ikut tercetak.<\x2fspan>`
+  $('#ptsIsi').innerHTML = `<div class="card mb3 row between"><div class="sm grow" style="min-width:260px">${T.kotor || T.kotorNilai || (T.ak && Object.values(T.ak.kotor).some(Boolean)) ? `<span class="c-warn b">${ic('exclamation-triangle')} Ada perubahan data tengah semester yang belum disimpan \u2014 simpan dulu agar ikut tercetak.<\x2fspan>`
       : `${ic('info-circle', 'c-vio')} <b>Cetak<\x2fb> memakai mesin cetak browser (tata letak paling presisi). <b>Unduh PDF<\x2fb> memakai konverter Google.`}<\x2fdiv>
     <div class="row"><button class="btn btn-out" data-aksi="ptsPratinjau" data-id="${(rows[0] || {}).id_siswa || ''}">${ic('eye')} Pratinjau<\x2fbutton><button class="btn btn-dark" data-aksi="ptsCetakKelas">${ic('printer')} Cetak 1 kelas<\x2fbutton><button class="btn btn-lime" data-aksi="ptsUnduhKelas">${ic('cloud-download')} Unduh PDF 1 kelas<\x2fbutton><\x2fdiv><\x2fdiv>
     <div class="card p0" id="tblPts"><\x2fdiv>`;
@@ -3167,6 +3269,25 @@ Object.assign(AKSI, {
 
 
 
+
+Object.assign(AKSI, {
+  async ptsNilaiSimpan(t) {
+    const T = S.ui.T, g = T.sheetN ? T.sheetN.galat() : [];
+    if (g.length) { toast(`${g.length} sel bertanda merah perlu diperbaiki.`, 'warn'); return T.sheetN.fokusGalat(); }
+    if (ptsNilaiTakValid()) { toast('Ada isian tidak valid di tampilan lain (nilai harus 0\u2013100, CP maksimal 600 karakter). Periksa tampilan Semua mapel atau mapel lain.', 'warn', 7000); return; }
+    const baris = ptsNilaiPerubahan();
+    if (!baris.length) { toast('Belum ada perubahan nilai untuk disimpan.', 'info'); return; }
+    await simpanPtsJenis('nilai', t, baris);
+  },
+  ptsNilaiMode(t) { S.ui.T.modeNilai = t.dataset.m; renderPtsNilai(); },
+  async ptsNilaiBatal() {
+    const T = S.ui.T;
+    if (!T.kotorNilai) { toast('Tidak ada perubahan untuk dibatalkan.', 'info'); return; }
+    if (!(await konfirmasi({ judul: 'Batalkan semua perubahan nilai?', pesan: 'Nilai dan capaian di tabel dikembalikan ke data yang tersimpan.', ya: 'Batalkan' }))) return;
+    T.baris.forEach(b => { const asli = T.nilaiAsli[b.id_siswa] || {}; T.d.mapel.forEach(m => PTS_BIDANG.forEach(([p]) => { const k = p + m.id_mapel; b[k] = asli[k] === undefined ? '' : String(asli[k]); })); });
+    T.kotorNilai = false; tandaiPts(); renderPtsNilai();
+  }
+});
 
 const KERTAS_C = { A4: [21, 29.7], F4: [21.5, 33], Letter: [21.59, 27.94] };
 const PRESET_MARGIN = { rapat: { atas: 1.5, kiri: 2, kanan: 1.5, bawah: 1.5 }, dinas: { atas: 2.5, kiri: 3, kanan: 2, bawah: 2.5 }, ringkas: { atas: 2, kiri: 2, kanan: 2, bawah: 2 } };
