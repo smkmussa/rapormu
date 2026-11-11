@@ -374,8 +374,9 @@ const HAL = {
   lembar: { judul: 'Lembar Nilai', induk: 'nilai', r: (el, p) => hLembar(el, p) },
   kelasku: { judul: () => (S.me.isSA ? 'Data Wali Kelas' : 'Kelas Saya'), ikon: 'person-video3', tag: () => (S.me.isSA ? '' : 'Wali'), r: (el, p) => hKelasku(el, p) },
   rapor: { judul: 'Rapor & Leger', ikon: 'file-earmark-text', r: (el, p) => hRapor(el, p) },
-  pratinjau: { judul: 'Pratinjau', induk: () => (S.param && S.param.jenis === 'pts' ? 'pts' : 'rapor'), r: (el, p) => hPratinjau(el, p) },
+  pratinjau: { judul: 'Pratinjau', induk: () => (S.param && S.param.jenis === 'pts' ? 'pts' : S.param && S.param.jenis === 'identitas' ? 'identitas' : 'rapor'), r: (el, p) => hPratinjau(el, p) },
   pts: { judul: 'Rapor Tengah Semester', ikon: 'clipboard-data', r: (el, p) => hPts(el, p) },
+  identitas: { judul: 'Identitas Rapor', ikon: 'person-vcard', r: (el, p) => hIdentitas(el, p) },
   cetak: { judul: 'Tata Cetak Rapor', ikon: 'printer', sa: true, r: (el, p) => hCetak(el, p) },
   tampilan: { judul: 'Halaman Login', ikon: 'door-open', sa: true, r: el => hTampilan(el) },
   rekap: { judul: 'Pencarian & Rekap', ikon: 'search', r: (el, p) => hRekap(el, p) },
@@ -392,8 +393,8 @@ const indukHal = k => { const i = HAL[k].induk; return (typeof i === 'function' 
 const judulHal = k => { const j = HAL[k].judul; return typeof j === 'function' ? j() : j; };
 const isWali = () => S.waliKelas.length > 0;
 function menuPeran() {
-  if (S.me.isSA) return [['Menu utama', ['dashboard', 'nilai', 'kelasku', 'rapor', 'rekap', 'pts']], ['Data master', ['siswa', 'kelas', 'mapel', 'ekskul']], ['Sistem', ['akun', 'pengaturan', 'cetak', 'tampilan', 'log', 'profil']]];
-  return isWali() ? [['Kelas perwalian', ['dashboard', 'nilai', 'kelasku', 'rapor', 'rekap', 'pts']], ['Akun', ['profil']]] : [['Menu utama', ['dashboard']], ['Akun', ['profil']]];
+  if (S.me.isSA) return [['Menu utama', ['dashboard', 'nilai', 'kelasku', 'rapor', 'identitas', 'rekap', 'pts']], ['Data master', ['siswa', 'kelas', 'mapel', 'ekskul']], ['Sistem', ['akun', 'pengaturan', 'cetak', 'tampilan', 'log', 'profil']]];
+  return isWali() ? [['Kelas perwalian', ['dashboard', 'nilai', 'kelasku', 'rapor', 'identitas', 'rekap', 'pts']], ['Akun', ['profil']]] : [['Menu utama', ['dashboard']], ['Akun', ['profil']]];
 }
 function izin(hal) {
   const d = HAL[hal];
@@ -1186,7 +1187,7 @@ async function hLembar(el, p) {
   if (S.hal !== 'lembar') return;
   const L = S.ui.L = {
     p, data, versi: data.versi, final: data.final, ro: data.readOnly, status: 'tersimpan', waktu: data.terakhir ? data.terakhir.waktu : '',
-    modeTP: lsGet('erapor_modeTP', true), kotor: false, kunciDraf: `erapor_draf_n_${S.me.id}_${p.id_kelas}_${p.id_mapel}`,
+    modeTP: lsGet('erapor_kolomTP', false), kotor: false, kunciDraf: `erapor_draf_n_${S.me.id}_${p.id_kelas}_${p.id_mapel}`,
     baris: data.baris.map(b => Object.assign({}, b))
   };
   const tp = data.pengajaran.daftar_tp;
@@ -1257,7 +1258,7 @@ function renderLembar(el) {
   <div class="dockbar"><span class="dot" style="color:var(--lime)"><\x2fspan><b id="dkTeks">\u2014<\x2fb><div class="bar"><i id="dkBar" style="width:0"><\x2fi><\x2fdiv><b id="dkPct" class="tnum" style="color:var(--lime)">0%<\x2fb>
     <span class="sm grow" id="dkStatus" style="color:#C9C8D8"><\x2fspan>
     ${L.ro ? '' : `<button class="btn btn-lime" data-aksi="lembarSimpan">${ic('floppy')} Simpan draf sekarang<\x2fbutton>`}<\x2fdiv>`;
-  $('#lbModeTP', el).addEventListener('change', e => { L.modeTP = e.target.checked; lsSet('erapor_modeTP', L.modeTP); buatGridLembar(); });
+  $('#lbModeTP', el).addEventListener('change', e => { L.modeTP = e.target.checked; lsSet('erapor_kolomTP', L.modeTP); buatGridLembar(); });
   const nisn = $('#lbNisn', el); if (nisn) nisn.addEventListener('change', e => { L.sheet.nisnMode = e.target.checked; toast(e.target.checked ? 'Mode NISN aktif: kolom pertama data tempelan harus NISN.' : 'Mode NISN nonaktif: data ditempel mengikuti urutan baris.', 'info'); });
   buatGridLembar();
 }
@@ -1374,7 +1375,7 @@ Object.assign(AKSI, {
   async lembarIsiCP() {
     const L = S.ui.L;
     const adaTp = L.baris.map((b, r) => r).filter(r => L.baris[r].tpT || L.baris[r].tpR);
-    if (!adaTp.length) { L.modeTP = true; lsSet('erapor_modeTP', true); buatGridLembar(); return toast('Isi dulu nomor TP tertinggi\x2fterendah di kolom TP.', 'info'); }
+    if (!adaTp.length) { L.modeTP = true; lsSet('erapor_kolomTP', true); buatGridLembar(); return toast('Isi dulu nomor TP tertinggi\x2fterendah di kolom TP.', 'info'); }
     const manual = adaTp.filter(r => (L.baris[r].tpT && L.baris[r].cpT && !L.baris[r]._autoT) || (L.baris[r].tpR && L.baris[r].cpR && !L.baris[r]._autoR)).length;
     const timpa = manual ? await konfirmasi({ judul: 'Timpa CP yang ditulis manual?', pesan: `${manual} siswa memiliki CP yang diketik manual. Pilih <b>Timpa<\x2fb> untuk menyusun ulang semuanya dari TP, atau <b>Lewati<\x2fb> untuk hanya mengisi yang kosong.`, ya: 'Timpa semua', tidak: 'Lewati yang manual' }) : false;
     let n = 0;
@@ -1817,8 +1818,8 @@ Object.assign(AKSI, {
 });
 
 async function hPratinjau(el, p) {
-  const jenis = ['leger', 'pts', 'aik', 'aik_pts'].indexOf(p.jenis) > -1 ? p.jenis : 'rapor', tengah = jenis === 'pts' || jenis === 'aik_pts';
-  const asal = jenis === 'pts' ? ['pts', 'Rapor Tengah Semester'] : ['rapor', 'Rapor & Leger'];
+  const jenis = ['leger', 'pts', 'aik', 'aik_pts', 'identitas'].indexOf(p.jenis) > -1 ? p.jenis : 'rapor', tengah = jenis === 'pts' || jenis === 'aik_pts';
+  const asal = jenis === 'pts' ? ['pts', 'Rapor Tengah Semester'] : jenis === 'identitas' ? ['identitas', 'Identitas Rapor'] : ['rapor', 'Rapor & Leger'];
   if (!p.id_kelas) return buka(asal[0], {}, { tanpaRiwayat: true });
   el.innerHTML = skelHal();
   const cek = await ambilCek(p.id_kelas), PT = tengah ? await ambilPts(p.id_kelas) : null;
@@ -1826,14 +1827,14 @@ async function hPratinjau(el, p) {
   const daftar = PT ? PT.baris.map(b => ({ id_siswa: b.id_siswa, nama: b.nama, masalah: ptsKurang(PT, b) })) : cek.siswa;
   const idx = daftar.findIndex(s => s.id_siswa === p.id_siswa), s = daftar[idx];
   if (jenis !== 'leger' && !s) return buka(asal[0], { id_kelas: p.id_kelas }, { tanpaRiwayat: true });
-  const awalKunci = { rapor: 'rhtml_', pts: 'phtml_', aik: 'rhtml_aik_', aik_pts: 'phtml_aik_' }[jenis] || '', kunci = jenis === 'leger' ? 'lhtml_' + p.id_kelas : awalKunci + p.id_siswa;
-  const ambil = (k, id) => Cache.get(k, () => (jenis === 'leger' ? Api.ambil('buatLegerPdf', p.id_kelas, { format: 'html' }) : Api.ambil('buatRaporPdf', p.id_kelas, id, { format: 'html', jenis })), 60000);
+  const awalKunci = { rapor: 'rhtml_', pts: 'phtml_', aik: 'rhtml_aik_', aik_pts: 'phtml_aik_', identitas: 'ihtml_' + identitasHal().join('-') + '_' }[jenis] || '', kunci = jenis === 'leger' ? 'lhtml_' + p.id_kelas : awalKunci + p.id_siswa;
+  const ambil = (k, id) => Cache.get(k, () => (jenis === 'leger' ? Api.ambil('buatLegerPdf', p.id_kelas, { format: 'html' }) : Api.ambil('buatRaporPdf', p.id_kelas, id, { format: 'html', jenis, halaman: jenis === 'identitas' ? identitasHal() : undefined })), 60000);
   const sebelum = daftar[idx - 1], sesudah = daftar[idx + 1];
-  el.innerHTML = `<div class="crumb"><button data-aksi="buka" data-hal="dashboard">${ic('house')} Beranda<\x2fbutton>${ic('chevron-right')}<button data-aksi="buka" data-hal="${asal[0]}" data-param='${h(JSON.stringify({ id_kelas: p.id_kelas }))}'>${asal[1]}<\x2fbutton>${ic('chevron-right')}<b>Pratinjau ${{ rapor: 'Rapor Siswa', pts: 'Rapor Tengah Semester', aik: 'Rapor AIK', aik_pts: 'Rapor AIK Tengah Semester', leger: 'Leger' }[jenis]}<\x2fb><\x2fdiv>
+  el.innerHTML = `<div class="crumb"><button data-aksi="buka" data-hal="dashboard">${ic('house')} Beranda<\x2fbutton>${ic('chevron-right')}<button data-aksi="buka" data-hal="${asal[0]}" data-param='${h(JSON.stringify({ id_kelas: p.id_kelas }))}'>${asal[1]}<\x2fbutton>${ic('chevron-right')}<b>Pratinjau ${{ rapor: 'Rapor Siswa', pts: 'Rapor Tengah Semester', aik: 'Rapor AIK', aik_pts: 'Rapor AIK Tengah Semester', leger: 'Leger', identitas: 'Identitas Rapor' }[jenis]}<\x2fb><\x2fdiv>
     <div class="card mb3" style="padding:12px 16px"><div class="row between">
       <div class="row"><button class="btn btn-sm btn-out" data-aksi="buka" data-hal="${asal[0]}" data-param='${h(JSON.stringify({ id_kelas: p.id_kelas }))}'>${ic('arrow-left')} Kembali ke daftar kelas<\x2fbutton>
         <span id="pvSt" class="pill p-gray">Memuat\u2026<\x2fspan><span class="sm muted">${h(cek.kelas.nama_kelas)}${s ? ' \u00b7 <b style="color:var(--text)">' + h(s.nama) + '<\x2fb>' : ''}<\x2fspan><\x2fdiv>
-      <div class="row"><div class="seg">${[['rapor', 'Rapor akhir'], ['aik', 'AIK'], ['pts', 'PTS'], ['aik_pts', 'AIK PTS'], ['leger', 'Leger']].filter(x => cek.aik || x[0].indexOf('aik') < 0).map(x => `<button class="${jenis === x[0] ? 'aktif' : ''}" data-aksi="pvJenis" data-j="${x[0]}">${x[1]}<\x2fbutton>`).join('')}<\x2fdiv>
+      <div class="row"><div class="seg">${[['rapor', 'Rapor akhir'], ['aik', 'AIK'], ['pts', 'PTS'], ['aik_pts', 'AIK PTS'], ['leger', 'Leger'], ['identitas', 'Identitas']].filter(x => cek.aik || x[0].indexOf('aik') < 0).map(x => `<button class="${jenis === x[0] ? 'aktif' : ''}" data-aksi="pvJenis" data-j="${x[0]}">${x[1]}<\x2fbutton>`).join('')}<\x2fdiv>
         ${jenis !== 'leger' ? `<button class="btn btn-sm btn-icon btn-out" ${sebelum ? `data-aksi="pvSiswa" data-id="${sebelum.id_siswa}"` : 'disabled'} aria-label="Siswa sebelumnya">${ic('chevron-left')}<\x2fbutton><span class="sm tnum">${idx + 1}\x2f${daftar.length}<\x2fspan><button class="btn btn-sm btn-icon btn-out" ${sesudah ? `data-aksi="pvSiswa" data-id="${sesudah.id_siswa}"` : 'disabled'} aria-label="Siswa berikutnya">${ic('chevron-right')}<\x2fbutton>` : ''}
         <button class="btn btn-sm btn-dark" data-aksi="pvCetak" disabled>${ic('printer')} Cetak<\x2fbutton><button class="btn btn-sm btn-lime" data-aksi="pvUnduh">${ic('download')} Unduh PDF<\x2fbutton><\x2fdiv><\x2fdiv><\x2fdiv>
     <div id="pvInfo" class="mb3"><\x2fdiv><div id="pvBox"><div class="sk" style="height:70vh"><\x2fdiv><\x2fdiv>`;
@@ -1845,7 +1846,14 @@ async function hPratinjau(el, p) {
   $('#pvInfo').innerHTML = d.draf
     ? `<div class="al al-warn">${ic('exclamation-triangle')}<div><b>Dokumen masih draf.<\x2fb> ${jenis === 'aik' || jenis === 'aik_pts' ? 'Ada nilai mapel AIK yang belum lengkap.' : jenis !== 'leger' && s ? h(s.masalah.join('; ')) + '.' : 'Masih ada nilai yang belum terisi.'} Lembar dicetak dengan tanda air DRAF sampai data lengkap.<\x2fdiv><\x2fdiv>`
     : `<div class="al al-ok">${ic('patch-check')}<div><b>Validasi dokumen selesai.<\x2fb> Data lengkap dan siap ditandatangani basah maupun digital (bila diaktifkan di Pengaturan).<\x2fdiv><\x2fdiv>`;
-  $('#pvBox').innerHTML = `<iframe class="prev-frame" id="pvFrame" title="Pratinjau ${jenis}"><\x2fiframe>`;
+  if (jenis === 'identitas') {
+    $('#pvSt').className = 'pill ' + (d.kosong ? 'p-butter' : 'p-mint');
+    $('#pvSt').innerHTML = d.kosong ? `${ic('info-circle')} ${d.kosong} isian kosong` : `${ic('check-circle')} Isian lengkap`;
+    $('#pvInfo').innerHTML = d.kosong
+      ? `<div class="al al-info">${ic('info-circle')}<div><b>${d.kosong} isian identitas peserta didik masih kosong<\x2fb> dan dicetak sebagai teks isian kosong. Lengkapi di menu <b>Identitas Rapor \u2192 Data Peserta Didik<\x2fb>, atau data inti di menu Data Siswa.<\x2fdiv><\x2fdiv>`
+      : `<div class="al al-ok">${ic('patch-check')}<div><b>Semua isian identitas yang dicetak sudah terisi.<\x2fb><\x2fdiv><\x2fdiv>`;
+  }
+  $('#pvBox').innerHTML = `<iframe class="prev-frame\" id="pvFrame" title="Pratinjau ${jenis}"><\x2fiframe>`;
   $('#pvFrame').srcdoc = d.html;
   $('[data-aksi="pvCetak"]').disabled = false;
   if (jenis !== 'leger' && sesudah && !Cache.ada(awalKunci + sesudah.id_siswa)) setTimeout(() => ambil(awalKunci + sesudah.id_siswa, sesudah.id_siswa).catch(() => {   }), 400);
@@ -1857,13 +1865,198 @@ Object.assign(AKSI, {
   async pvUnduh(t) {
     const pv = S.ui.pv;
     await proses(t, async () => {
-      try { const d = pv.jenis === 'leger' ? await ambilPdf('buatLegerPdf', [pv.id_kelas]) : await ambilPdf('buatRaporPdf', [pv.id_kelas, pv.id_siswa], null, { jenis: pv.jenis }); unduhPdf(d); toast('PDF diunduh: ' + d.nama); } catch (e) { galat(e); }
+      try { const d = pv.jenis === 'leger' ? await ambilPdf('buatLegerPdf', [pv.id_kelas]) : await ambilPdf('buatRaporPdf', [pv.id_kelas, pv.id_siswa], null, { jenis: pv.jenis, halaman: pv.jenis === 'identitas' ? identitasHal() : undefined }); unduhPdf(d); toast('PDF diunduh: ' + d.nama); } catch (e) { galat(e); }
     }, 'Membuat PDF\u2026');
   }
 });
 
 
 
+
+const ID_HAL = [['sampul', 'Sampul'], ['sekolah', 'Identitas Sekolah'], ['siswa', 'Identitas Peserta Didik']];
+const identitasHal = () => { const v = lsGet('erapor_identitasHal', null), ok = Array.isArray(v) ? ID_HAL.map(x => x[0]).filter(x => v.indexOf(x) > -1) : []; return ok.length ? ok : ID_HAL.map(x => x[0]); };
+const IDN_LEBAR = { anak_ke: 90, diterima_semester: 110, ijazah_tahun: 90, skhun_tahun: 90, email: 200, email_ortu: 200, email_wali: 200, asal_alamat: 240, alamat_ortu: 260, alamat_wali: 260 };
+async function hIdentitas(el, p) {
+  const pilihan = pilihanRapor();
+  const id = p.id_kelas || (pilihan.some(k => k.id_kelas === S.ui.kelasIdentitas) ? S.ui.kelasIdentitas : (pilihan[0] || {}).id_kelas);
+  if (!id) { el.innerHTML = ph({ crumb: ['Identitas Rapor'], judul: 'Identitas rapor' }) + `<div class="card">${kosong('Belum ada kelas', 'Tambahkan kelas terlebih dahulu.', '', 'door-open')}<\x2fdiv>`; return; }
+  S.ui.kelasIdentitas = id;
+  el.innerHTML = skelHal();
+  const d = await Api.ambil('getIdentitas', id);
+  if (S.hal !== 'identitas') return;
+  const dataK = d.bidang.filter(b => b.jenis === 'data'), tabAwal = p.tab || S.ui.tabIdentitas || 'cetak';
+  S.ui.I = {
+    id, d, pilihan, dataK, kotor: false, aturKotor: false, tab: tabAwal === 'atur' && !d.bisaAtur ? 'cetak' : tabAwal, asli: {},
+    baris: d.siswa.map((s, i) => { const o = { id_siswa: s.id_siswa, no: s.no || i + 1, nama: s.nama, nisn: s.nisn }; dataK.forEach(b => { o['d_' + b.k] = String(s.data[b.k] === undefined || s.data[b.k] === null ? '' : s.data[b.k]); }); return o; })
+  };
+  S.ui.I.baris.forEach(b => { const a = S.ui.I.asli[b.id_siswa] = {}; dataK.forEach(x => { a[x.k] = b['d_' + x.k]; }); });
+  renderIdentitas(el);
+}
+function tandaiIdn() {
+  const I = S.ui.I;
+  if (!I) return;
+  const bag = (I.kotor ? ['data peserta didik'] : []).concat(I.aturKotor ? ['teks identitas'] : []);
+  tandaiKotor(bag.length ? `Identitas rapor (${bag.join(', ')}) belum disimpan.` : null);
+}
+function renderIdentitas(el) {
+  const I = S.ui.I, d = I.d;
+  el.innerHTML = ph({
+    crumb: ['Identitas Rapor', singkat(d.kelas.nama_kelas)], judul: `Identitas rapor: ${h(d.kelas.nama_kelas)}`,
+    chips: `<span class="pill p-lav">${d.siswa.length} siswa<\x2fspan><span class="pill p-gray">TA ${h(S.ta)}<\x2fspan>`,
+    aksi: `${I.pilihan.length > 1 ? `<select class="in" style="width:auto" id="idnKelas" aria-label="Pilih kelas">${opsi(I.pilihan.map(x => [x.id_kelas, x.nama_kelas]), I.id)}<\x2fselect>` : ''}
+      <div class="tabs" role="tablist">${[['cetak', 'printer', 'Cetak'], ['data', 'person-lines-fill', 'Data Peserta Didik']].concat(d.bisaAtur ? [['atur', 'sliders', 'Atur Teks']] : []).map(t => `<button role="tab" class="${I.tab === t[0] ? 'aktif' : ''}" data-aksi="tabIdentitas" data-t="${t[0]}">${ic(t[1])} ${t[2]}<\x2fbutton>`).join('')}<\x2fdiv>`
+  }) + '<div id="idnIsi"><\x2fdiv>';
+  const sel = $('#idnKelas', el);
+  if (sel) sel.addEventListener('change', () => { buka('identitas', { id_kelas: sel.value, tab: I.tab }).then(() => { const x = $('#idnKelas'); if (x && S.ui.I) x.value = S.ui.I.id; }); });
+  if (I.tab === 'data') renderIdnData();
+  else if (I.tab === 'atur') renderIdnAtur();
+  else renderIdnCetak();
+}
+function renderIdnCetak() {
+  const I = S.ui.I, d = I.d, hal = identitasHal(), totalData = I.dataK.filter(x => x.tampil).length;
+  const rows = I.baris.map((b, i) => { const s = d.siswa[i] || {}; return Object.assign({}, b, { isi: (s.terisiSiswa || 0) + I.dataK.filter(x => x.tampil && String(b['d_' + x.k] || '').trim()).length, total: (s.totalSiswa || 0) + totalData }); });
+  $('#idnIsi').innerHTML = `<div class="card mb3"><div class="row between" style="align-items:center;gap:12px;flex-wrap:wrap">
+      <div><b>Halaman yang dicetak<\x2fb><div class="row mt2" style="gap:18px;flex-wrap:wrap">${ID_HAL.map(x => `<label class="row" style="gap:6px;cursor:pointer"><input type="checkbox" class="idnHal" value="${x[0]}" ${hal.indexOf(x[0]) > -1 ? 'checked' : ''}> ${x[1]}<\x2flabel>`).join('')}<\x2fdiv>
+        <p class="xs muted mt2">Setiap siswa mendapat halaman yang dicentang, berurutan. Pilihan ini diingat di browser ini.<\x2fp><\x2fdiv>
+      <button class="btn btn-dark" data-aksi="idnCetakKelas" ${rows.length ? '' : 'disabled'}>${ic('printer')} Cetak satu kelas (${rows.length} siswa)<\x2fbutton><\x2fdiv><\x2fdiv>
+    <div class="card p0" id="tblIdn"><\x2fdiv>`;
+  $$('.idnHal').forEach(c => c.addEventListener('change', () => {
+    const v = $$('.idnHal').filter(x => x.checked).map(x => x.value);
+    if (!v.length) { c.checked = true; toast('Pilih minimal satu halaman.', 'warn'); return; }
+    lsSet('erapor_identitasHal', v); Cache.hapus('ihtml_');
+  }));
+  new Tabel($('#tblIdn'), {
+    data: rows, idKey: 'id_siswa', ukuran: 50, cari: ['nama', 'nisn'], kosong: 'Kelas belum memiliki anggota.', kolom: [
+      { k: 'no', label: 'No', r: b => `<span class="mono">${b.no}<\x2fspan>` },
+      { k: 'nama', label: 'Nama siswa', r: b => `<div class="who">${av(b.nama)}<div><b>${h(b.nama)}<\x2fb><small class="mono">${h(b.nisn || '-')}<\x2fsmall><\x2fdiv><\x2fdiv>` },
+      { k: 'isi', label: 'Isian identitas', r: b => `<span class="pill sm ${b.isi >= b.total ? 'p-mint' : 'p-peach'}">${b.isi}\x2f${b.total} terisi<\x2fspan>` },
+      { k: '', label: '', urut: false, r: b => `<button class="btn btn-xs btn-out" data-aksi="idnPratinjau" data-id="${b.id_siswa}">${ic('eye')} Pratinjau<\x2fbutton>` }
+    ]
+  }).render();
+}
+const idnPerubahan = () => {
+  const I = S.ui.I, out = [];
+  I.baris.forEach(b => {
+    const a = I.asli[b.id_siswa] || {}, o = {};
+    I.dataK.forEach(x => { const skrg = String(b['d_' + x.k] === undefined || b['d_' + x.k] === null ? '' : b['d_' + x.k]).trim(), dulu = String(a[x.k] === undefined ? '' : a[x.k]).trim(); if (skrg !== dulu) o[x.k] = { dari: dulu, ke: skrg }; });
+    if (Object.keys(o).length) out.push({ id_siswa: b.id_siswa, data: o });
+  });
+  return out;
+};
+const idnJumlahUbah = () => idnPerubahan().reduce((a, b) => a + Object.keys(b.data).length, 0);
+function renderIdnData() {
+  const I = S.ui.I, d = I.d;
+  $('#idnIsi').innerHTML = `<div class="card mb3"><div class="row between" style="align-items:stretch">
+      <div class="al al-info grow" style="max-width:860px">${ic('person-lines-fill')}<div>Isi data identitas tambahan peserta didik. Klik sel lalu ketik, atau tempel dari Excel (<kbd>Ctrl<\x2fkbd>+<kbd>V<\x2fkbd>). <b>Nama, NIS\x2fNISN, tempat &amp; tanggal lahir, jenis kelamin, agama, alamat, dan nama orang tua<\x2fb> diambil dari menu Data Siswa. Hanya sel yang Anda ubah yang disimpan; Log Aktivitas mencatat isian mana yang diubah, tanpa isi datanya.<\x2fdiv><\x2fdiv>
+      <div class="row"><button class="btn btn-out" data-aksi="idnBatal">${ic('arrow-counterclockwise')} Batalkan perubahan<\x2fbutton><button class="btn btn-dark" data-aksi="idnSimpan">${ic('floppy')} Simpan data<\x2fbutton><\x2fdiv><\x2fdiv><\x2fdiv>
+    <div class="card p0"><div class="card-h" style="padding:16px 20px 0"><div><h3>Data identitas peserta didik \u2014 ${h(singkat(d.kelas.nama_kelas))}<\x2fh3><p>${I.dataK.length} isian tambahan \u00b7 tanggal boleh ditulis bebas, mis. 21 Juli 2023<\x2fp><\x2fdiv><span class="pill" id="idnSt"><\x2fspan><\x2fdiv><div id="idnGrid" style="padding:16px 20px 20px"><\x2fdiv><\x2fdiv>`;
+  I.sheet = new Sheet($('#idnGrid'), {
+    ro: false, baris: I.baris,
+    kolom: [
+      { k: 'no', label: 'No', tipe: 'mono', w: 46, stk: true },
+      { k: 'nama', label: 'Nama siswa', tipe: 'ro', w: 210, stk: true, tampil: b => `<span style="font-weight:600">${h(b.nama)}<\x2fspan>` }
+    ].concat(I.dataK.map(x => ({ k: 'd_' + x.k, label: h(x.labelKolom) + (x.tampil ? '' : ' <span class="xs">(tidak dicetak)<\x2fspan>'), labelPendek: x.labelKolom, tipe: 'teks', maks: 300, w: IDN_LEBAR[x.k] || 170 }))),
+    saatUbah: () => { I.kotor = idnJumlahUbah() > 0; tandaiIdn(); statIdn(); },
+    saatTempel: i => toast(ringkasTempel(i), i.galat ? 'warn' : 'ok', 6000)
+  });
+  S.ui.simpanCepat = () => { const b = $('[data-aksi="idnSimpan"]'); if (b) AKSI.idnSimpan(b); };
+  statIdn();
+}
+function statIdn() {
+  const st = $('#idnSt');
+  if (!st) return;
+  const n = idnJumlahUbah();
+  st.className = 'pill ' + (n ? 'p-butter' : 'p-mint');
+  st.innerHTML = n ? `${ic('pencil')} ${n} isian belum disimpan` : `${ic('check-circle-fill')} Tersimpan`;
+}
+function renderIdnAtur(cfgPakai) {
+  const I = S.ui.I, d = I.d, c = cfgPakai || d.cfg, o = d.otomatis;
+  const ta = (id, v, r, pl) => `<textarea class="in" id="${id}" rows="${r}"${pl ? ` placeholder="${h(pl)}"` : ''}>${h(v)}<\x2ftextarea>`;
+  const inp = (id, v, pl) => `<input class="in" id="${id}" value="${h(v)}"${pl ? ` placeholder="${h(pl)}"` : ''}>`;
+  const f = (label, isi, ket) => `<div class="f"><label>${label}<\x2flabel>${isi}${ket ? `<div class="xs muted mt1">${ket}<\x2fdiv>` : ''}<\x2fdiv>`;
+  let no = 0, huruf = 0;
+  const baris = d.bidang.map(b => {
+    if (b.tingkat === 'utama') { no++; huruf = 0; } else if (b.tingkat === 'huruf') huruf++;
+    const nomor = b.tingkat === 'utama' ? no + '.' : b.tingkat === 'huruf' ? String.fromCharCode(96 + huruf) + '.' : '';
+    const geser = b.tingkat === 'huruf' ? 18 : b.tingkat === 'sub' ? 36 : 0;
+    return `<tr><td class="mono xs" style="padding-left:${8 + geser}px">${nomor}<\x2ftd><td><input class="in idnLbl" data-k="${b.k}" value="${h(c.siswa.label[b.k] || b.labelAwal)}" placeholder="${h(b.labelAwal)}" aria-label="Label ${h(b.labelAwal)}"><\x2ftd>` +
+      `<td style="text-align:center"><input type="checkbox" class="idnTampil" data-k="${b.k}" ${c.siswa.sembunyi.indexOf(b.k) > -1 ? '' : 'checked'} aria-label="Cetak ${h(b.labelAwal)}"><\x2ftd>` +
+      `<td class="xs muted">${b.jenis === 'siswa' ? 'Data Siswa' : b.jenis === 'grup' ? 'Judul' : 'Menu ini'}<\x2ftd><\x2ftr>`;
+  }).join('');
+  $('#idnIsi').innerHTML = `<div class="card mb3"><div class="row between" style="align-items:center;gap:12px;flex-wrap:wrap"><div class="al al-info grow" style="max-width:760px">${ic('sliders')}<div>Atur teks yang tercetak di ketiga halaman. Berlaku untuk <b>semua kelas<\x2fb>. Simpan, lalu lihat hasilnya lewat <b>Pratinjau<\x2fb>.<\x2fdiv><\x2fdiv>
+      <div class="row"><button class="btn btn-out" data-aksi="idnAturAwal">${ic('arrow-counterclockwise')} Kembalikan ke bawaan<\x2fbutton><button class="btn btn-out" data-aksi="idnPratinjau" data-id="${(I.baris[0] || {}).id_siswa || ''}" ${I.baris.length ? '' : 'disabled'}>${ic('eye')} Pratinjau<\x2fbutton><button class="btn btn-dark" data-aksi="idnAturSimpan">${ic('floppy')} Simpan pengaturan<\x2fbutton><\x2fdiv><\x2fdiv><\x2fdiv>
+    <div class="g c2">
+      <div class="card"><h3 class="mb2">Sampul<\x2fh3>
+        ${f('Judul atas (satu baris per baris cetak)', ta('ia_sampul_atas', c.sampul.atas, 3))}
+        <div class="g c2">${f('Label nama', inp('ia_sampul_labelNama', c.sampul.labelNama))}${f('Label NISN', inp('ia_sampul_labelNisn', c.sampul.labelNisn))}<\x2fdiv>
+        ${f('Baris bawah (satu baris per baris cetak)', ta('ia_sampul_bawah', c.sampul.bawah, 3, 'Mis. nama majelis, yayasan, atau daerah'))}
+        <label class="switch mt2"><input type="checkbox" id="ia_sampul_logo" ${c.sampul.logo ? 'checked' : ''}><span><\x2fspan> Tampilkan logo sekolah (dari Pengaturan)<\x2flabel><\x2fdiv>
+      <div class="card"><h3 class="mb2">Identitas Sekolah<\x2fh3>
+        ${f('Judul halaman (satu baris per baris cetak)', ta('ia_sekolah_judul', c.sekolah.judul, 3))}
+        ${f('Rincian sekolah', ta('ia_sekolah_rincian', c.sekolah.rincian, 13), 'Satu baris per isian: <b>Label : Isi<\x2fb>. Baris tanpa titik dua dicetak sebagai lanjutan baris sebelumnya.')}<\x2fdiv><\x2fdiv>
+    <div class="card mt3"><h3 class="mb2">Identitas Peserta Didik<\x2fh3>
+      <div class="g c2">${f('Judul halaman', inp('ia_siswa_judul', c.siswa.judul))}${f('Teks untuk isian kosong', inp('ia_siswa_kosong', c.siswa.kosong), 'Mis. "-" atau "0". Kosongkan agar tidak dicetak apa pun.')}<\x2fdiv>
+      <div class="g c2">${f('Teks kotak pas foto', ta('ia_siswa_foto', c.siswa.foto, 2), 'Kosongkan untuk menghilangkan kotak foto.')}${f('Tempat, tanggal', inp('ia_siswa_tempatTanggal', c.siswa.tempatTanggal, o.tempatTanggal), 'Kosongkan = ikut Pengaturan (tempat &amp; tanggal rapor).')}<\x2fdiv>
+      <div class="g c2">${f('Jabatan penanda tangan', ta('ia_siswa_jabatan', c.siswa.jabatan, 2, o.jabatan), 'Kosongkan = ikut Pengaturan.')}<div class="g c2">${f('Nama', inp('ia_siswa_nama', c.siswa.nama, o.nama), 'Kosongkan = kepala sekolah di Pengaturan.')}${f('Nomor', inp('ia_siswa_nomor', c.siswa.nomor, o.nomor))}<\x2fdiv><\x2fdiv>
+      <h4 class="mt3 mb2">Isian dan labelnya<\x2fh4><p class="xs muted mb2">Ubah label sesuai format sekolah. Hapus centang <b>Cetak<\x2fb> untuk menyembunyikan isian; isian a., b., dan baris tambahan di bawahnya ikut tersembunyi. Nomor urut menyesuaikan otomatis.<\x2fp>
+      <div class="tw"><table class="tbl"><thead><tr><th style="width:64px">No<\x2fth><th>Label<\x2fth><th style="width:70px;text-align:center">Cetak<\x2fth><th style="width:110px">Sumber data<\x2fth><\x2ftr><\x2fthead><tbody>${baris}<\x2ftbody><\x2ftable><\x2fdiv><\x2fdiv>`;
+  $('#idnIsi').addEventListener('input', () => { if (S.ui.I && S.ui.I.tab === 'atur') { S.ui.I.aturKotor = true; tandaiIdn(); } });
+  $('#idnIsi').addEventListener('change', () => { if (S.ui.I && S.ui.I.tab === 'atur') { S.ui.I.aturKotor = true; tandaiIdn(); } });
+}
+Object.assign(AKSI, {
+  tabIdentitas(t) { S.ui.tabIdentitas = S.ui.I.tab = t.dataset.t; renderIdentitas($('#pg-identitas')); },
+  idnPratinjau(t) {
+    const I = S.ui.I;
+    if (!t.dataset.id) return;
+    if (I.kotor || I.aturKotor) toast('Ada perubahan yang belum disimpan \u2014 pratinjau memakai data yang sudah tersimpan.', 'warn', 6000);
+    buka('pratinjau', { jenis: 'identitas', id_kelas: I.id, id_siswa: t.dataset.id });
+  },
+  async idnCetakKelas(t) { await proses(t, async () => { try { cetakHtml((await Api.ambil('buatRaporPdf', S.ui.I.id, null, { format: 'html', jenis: 'identitas', halaman: identitasHal() })).html); } catch (e) { galat(e); } }, 'Menyusun halaman\u2026'); },
+  async idnSimpan(t) {
+    const I = S.ui.I, g = I.sheet ? I.sheet.galat() : [];
+    if (g.length) { toast(`${g.length} sel bertanda merah perlu diperbaiki.`, 'warn'); return I.sheet.fokusGalat(); }
+    const baris = idnPerubahan();
+    if (!baris.length) { toast('Belum ada perubahan untuk disimpan.', 'info'); return; }
+    await proses(t, async () => {
+      try {
+        const r = await Api.panggil('simpanIdentitas', I.id, baris);
+        if (!r.ok) {
+          if (r.kode === 'KONFLIK') { if (await konfirmasi({ judul: 'Data telah diubah pengguna lain', pesan: h(r.pesan), ya: 'Muat ulang' })) { tandaiKotor(null); muatUlang(); } return; }
+          throw new ApiGalat(r);
+        }
+        I.baris.forEach(b => { const a = I.asli[b.id_siswa] = I.asli[b.id_siswa] || {}; I.dataK.forEach(x => { const v = String(b['d_' + x.k] || '').trim(); b['d_' + x.k] = v; a[x.k] = v; }); });
+        I.kotor = false; tandaiIdn(); statIdn(); Cache.hapus('ihtml_'); toast(r.pesan);
+      } catch (e) { galat(e); }
+    }, 'Menyimpan\u2026');
+  },
+  async idnBatal() {
+    const I = S.ui.I;
+    if (!I.kotor) { toast('Tidak ada perubahan untuk dibatalkan.', 'info'); return; }
+    if (!(await konfirmasi({ judul: 'Batalkan semua perubahan?', pesan: 'Isian di tabel dikembalikan ke data yang tersimpan.', ya: 'Batalkan' }))) return;
+    I.baris.forEach(b => { const a = I.asli[b.id_siswa] || {}; I.dataK.forEach(x => { b['d_' + x.k] = a[x.k] === undefined ? '' : String(a[x.k]); }); });
+    I.kotor = false; tandaiIdn(); renderIdnData();
+  },
+  idnAturAwal() { renderIdnAtur(S.ui.I.d.cfgAwal); S.ui.I.aturKotor = true; tandaiIdn(); toast('Teks bawaan dimuat. Klik Simpan pengaturan untuk menerapkan.', 'info', 6000); },
+  async idnAturSimpan(t) {
+    const I = S.ui.I, v = id => ($('#' + id) || {}).value || '', label = {}, sembunyi = [];
+    $$('.idnLbl').forEach(x => { const b = I.d.bidang.find(y => y.k === x.dataset.k), isi = x.value.trim(); if (b && isi && isi !== b.labelAwal) label[b.k] = isi; });
+    $$('.idnTampil').forEach(x => { if (!x.checked) sembunyi.push(x.dataset.k); });
+    const cfg = {
+      sampul: { atas: v('ia_sampul_atas'), labelNama: v('ia_sampul_labelNama'), labelNisn: v('ia_sampul_labelNisn'), bawah: v('ia_sampul_bawah'), logo: !!($('#ia_sampul_logo') || {}).checked },
+      sekolah: { judul: v('ia_sekolah_judul'), rincian: v('ia_sekolah_rincian') },
+      siswa: { judul: v('ia_siswa_judul'), kosong: v('ia_siswa_kosong'), foto: v('ia_siswa_foto'), tempatTanggal: v('ia_siswa_tempatTanggal').trim(), jabatan: v('ia_siswa_jabatan').trim(), nama: v('ia_siswa_nama').trim(), nomor: v('ia_siswa_nomor').trim(), label, sembunyi }
+    };
+    await proses(t, async () => {
+      try {
+        const r = await Api.panggil('simpanData', 'pengaturan', { identitas_json: JSON.stringify(cfg) });
+        if (!r.ok) throw new ApiGalat(r);
+        if (r.data) S.set = Object.assign(S.set || {}, r.data);
+        I.aturKotor = false; tandaiIdn(); Cache.hapus('ihtml_'); toast(r.pesan);
+        await buka('identitas', { id_kelas: I.id, tab: 'atur' }, { tanpaRiwayat: true });
+      } catch (e) { galat(e); }
+    }, 'Menyimpan\u2026');
+  }
+});
 
 async function hRekap(el) {
   const f = S.ui.fRekap || (S.ui.fRekap = { ta: S.ta, sem: S.sem, kelas: '', mapel: '', status: '', q: '' });
