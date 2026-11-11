@@ -1904,7 +1904,7 @@ function renderIdentitas(el) {
     crumb: ['Identitas Rapor', singkat(d.kelas.nama_kelas)], judul: `Identitas rapor: ${h(d.kelas.nama_kelas)}`,
     chips: `<span class="pill p-lav">${d.siswa.length} siswa<\x2fspan><span class="pill p-gray">TA ${h(S.ta)}<\x2fspan>`,
     aksi: `${I.pilihan.length > 1 ? `<select class="in" style="width:auto" id="idnKelas" aria-label="Pilih kelas">${opsi(I.pilihan.map(x => [x.id_kelas, x.nama_kelas]), I.id)}<\x2fselect>` : ''}
-      <div class="tabs" role="tablist">${[['cetak', 'printer', 'Cetak'], ['data', 'person-lines-fill', 'Data Peserta Didik']].concat(d.bisaAtur ? [['atur', 'sliders', 'Atur Teks']] : []).map(t => `<button role="tab" class="${I.tab === t[0] ? 'aktif' : ''}" data-aksi="tabIdentitas" data-t="${t[0]}">${ic(t[1])} ${t[2]}<\x2fbutton>`).join('')}<\x2fdiv>`
+      <div class="tabs" role="tablist">${[['cetak', 'printer', 'Cetak'], ['data', 'person-lines-fill', 'Data Peserta Didik']].concat(d.bisaAtur ? [['atur', 'sliders', 'Atur Tampilan']] : []).map(t => `<button role="tab" class="${I.tab === t[0] ? 'aktif' : ''}" data-aksi="tabIdentitas" data-t="${t[0]}">${ic(t[1])} ${t[2]}<\x2fbutton>`).join('')}<\x2fdiv>`
   }) + '<div id="idnIsi"><\x2fdiv>';
   const sel = $('#idnKelas', el);
   if (sel) sel.addEventListener('change', () => { buka('identitas', { id_kelas: sel.value, tab: I.tab }).then(() => { const x = $('#idnKelas'); if (x && S.ui.I) x.value = S.ui.I.id; }); });
@@ -1969,6 +1969,23 @@ function statIdn() {
   st.className = 'pill ' + (n ? 'p-butter' : 'p-mint');
   st.innerHTML = n ? `${ic('pencil')} ${n} isian belum disimpan` : `${ic('check-circle-fill')} Tersimpan`;
 }
+async function idnMuatLogo() {
+  const I = S.ui.I, kotak = $('#idnLogoPrev'), ket = $('#idnLogoKet');
+  if (!kotak || !ket) return;
+  const id = I.d.logo.sampul || I.d.logo.sekolah, asal = I.d.logo.sampul ? 'Logo sampul khusus terpasang.' : I.d.logo.sekolah ? 'Belum ada logo sampul \u2014 memakai logo sekolah dari Pengaturan.' : 'Belum ada logo.';
+  if (!id) { kotak.innerHTML = `<span class="xs muted">Tanpa logo<\x2fspan>`; ket.textContent = asal; return; }
+  const url = await gambar(id);
+  if (!url || !$('#idnLogoPrev')) { ket.textContent = asal; return; }
+  const img = new Image();
+  img.onload = () => {
+    const cm = Number(($('#ia_sampul_logoCm') || {}).value) || I.d.cfg.sampul.logoCm || 8, dpi = Math.round(img.naturalWidth / (cm / 2.54));
+    ket.innerHTML = `${h(asal)}<br><span class="${dpi < 200 ? 'c-warn' : 'c-ok'}">${img.naturalWidth} \u00d7 ${img.naturalHeight} px \u00b7 \u00b1${dpi} dpi pada lebar ${cm} cm${dpi < 200 ? ' \u2014 kurang tajam untuk dicetak' : ' \u2014 tajam'}<\x2fspan>`;
+  };
+  img.src = url;
+  kotak.innerHTML = '';
+  img.style.cssText = 'max-width:100%;max-height:100%';
+  kotak.appendChild(img);
+}
 function renderIdnAtur(cfgPakai) {
   const I = S.ui.I, d = I.d, c = cfgPakai || d.cfg, o = d.otomatis;
   const ta = (id, v, r, pl) => `<textarea class="in" id="${id}" rows="${r}"${pl ? ` placeholder="${h(pl)}"` : ''}>${h(v)}<\x2ftextarea>`;
@@ -1983,14 +2000,19 @@ function renderIdnAtur(cfgPakai) {
       `<td style="text-align:center"><input type="checkbox" class="idnTampil" data-k="${b.k}" ${c.siswa.sembunyi.indexOf(b.k) > -1 ? '' : 'checked'} aria-label="Cetak ${h(b.labelAwal)}"><\x2ftd>` +
       `<td class="xs muted">${b.jenis === 'siswa' ? 'Data Siswa' : b.jenis === 'grup' ? 'Judul' : 'Menu ini'}<\x2ftd><\x2ftr>`;
   }).join('');
-  $('#idnIsi').innerHTML = `<div class="card mb3"><div class="row between" style="align-items:center;gap:12px;flex-wrap:wrap"><div class="al al-info grow" style="max-width:760px">${ic('sliders')}<div>Atur teks yang tercetak di ketiga halaman. Berlaku untuk <b>semua kelas<\x2fb>. Simpan, lalu lihat hasilnya lewat <b>Pratinjau<\x2fb>.<\x2fdiv><\x2fdiv>
+  $('#idnIsi').innerHTML = `<div class="card mb3"><div class="row between" style="align-items:center;gap:12px;flex-wrap:wrap"><div class="al al-info grow" style="max-width:760px">${ic('sliders')}<div>Atur teks, logo sampul, dan margin tiap lembar. Berlaku untuk <b>semua kelas<\x2fb>. Simpan, lalu lihat hasilnya lewat <b>Pratinjau<\x2fb>.<\x2fdiv><\x2fdiv>
       <div class="row"><button class="btn btn-out" data-aksi="idnAturAwal">${ic('arrow-counterclockwise')} Kembalikan ke bawaan<\x2fbutton><button class="btn btn-out" data-aksi="idnPratinjau" data-id="${(I.baris[0] || {}).id_siswa || ''}" ${I.baris.length ? '' : 'disabled'}>${ic('eye')} Pratinjau<\x2fbutton><button class="btn btn-dark" data-aksi="idnAturSimpan">${ic('floppy')} Simpan pengaturan<\x2fbutton><\x2fdiv><\x2fdiv><\x2fdiv>
     <div class="g c2">
       <div class="card"><h3 class="mb2">Sampul<\x2fh3>
         ${f('Judul atas (satu baris per baris cetak)', ta('ia_sampul_atas', c.sampul.atas, 3))}
         <div class="g c2">${f('Label nama', inp('ia_sampul_labelNama', c.sampul.labelNama))}${f('Label NISN', inp('ia_sampul_labelNisn', c.sampul.labelNisn))}<\x2fdiv>
         ${f('Baris bawah (satu baris per baris cetak)', ta('ia_sampul_bawah', c.sampul.bawah, 3, 'Mis. nama majelis, yayasan, atau daerah'))}
-        <label class="switch mt2"><input type="checkbox" id="ia_sampul_logo" ${c.sampul.logo ? 'checked' : ''}><span><\x2fspan> Tampilkan logo sekolah (dari Pengaturan)<\x2flabel><\x2fdiv>
+        <label class="switch mt2"><input type="checkbox" id="ia_sampul_logo" ${c.sampul.logo ? 'checked' : ''}><span><\x2fspan> Tampilkan logo di sampul<\x2flabel>
+        <div class="f mt3"><label>Logo sampul<\x2flabel><div class="row" style="gap:14px;align-items:center;flex-wrap:nowrap">
+          <div id="idnLogoPrev" style="flex:none;width:96px;height:96px;border:1px dashed var(--line);border-radius:12px;display:flex;align-items:center;justify-content:center;overflow:hidden;background:repeating-conic-gradient(var(--line) 0 25%,transparent 0 50%) 50%\x2f12px 12px"><\x2fdiv>
+          <div><div id="idnLogoKet" class="sm">Memuat\u2026<\x2fdiv><div class="row mt2" style="gap:8px;flex-wrap:wrap"><button class="btn btn-sm btn-out" data-aksi="idnLogoUnggah">${ic('cloud-upload')} Unggah logo sampul<\x2fbutton>${d.logo.sampul ? `<button class="btn btn-sm btn-out" data-aksi="idnLogoHapus">${ic('trash')} Hapus<\x2fbutton>` : ''}<\x2fdiv><\x2fdiv><\x2fdiv>
+          <div class="xs muted mt1">Terpisah dari logo di Pengaturan. PNG atau JPEG resolusi tinggi (disarankan minimal 1000 px, maksimal 2 MB). Bila belum diunggah, sampul memakai logo sekolah dari Pengaturan yang disimpan kecil (600 px) sehingga bisa tampak buram.<\x2fdiv><\x2fdiv>
+        ${f('Lebar logo di sampul (cm)', `<input class="in" id="ia_sampul_logoCm" type="number" min="2" max="14" step="0.5" value="${c.sampul.logoCm}" style="max-width:140px">`)}<\x2fdiv>
       <div class="card"><h3 class="mb2">Identitas Sekolah<\x2fh3>
         ${f('Judul halaman (satu baris per baris cetak)', ta('ia_sekolah_judul', c.sekolah.judul, 3))}
         ${f('Rincian sekolah', ta('ia_sekolah_rincian', c.sekolah.rincian, 13), 'Satu baris per isian: <b>Label : Isi<\x2fb>. Baris tanpa titik dua dicetak sebagai lanjutan baris sebelumnya.')}<\x2fdiv><\x2fdiv>
@@ -1999,7 +2021,10 @@ function renderIdnAtur(cfgPakai) {
       <div class="g c2">${f('Teks kotak pas foto', ta('ia_siswa_foto', c.siswa.foto, 2), 'Kosongkan untuk menghilangkan kotak foto.')}${f('Tempat, tanggal', inp('ia_siswa_tempatTanggal', c.siswa.tempatTanggal, o.tempatTanggal), 'Kosongkan = ikut Pengaturan (tempat &amp; tanggal rapor).')}<\x2fdiv>
       <div class="g c2">${f('Jabatan penanda tangan', ta('ia_siswa_jabatan', c.siswa.jabatan, 2, o.jabatan), 'Kosongkan = ikut Pengaturan.')}<div class="g c2">${f('Nama', inp('ia_siswa_nama', c.siswa.nama, o.nama), 'Kosongkan = kepala sekolah di Pengaturan.')}${f('Nomor', inp('ia_siswa_nomor', c.siswa.nomor, o.nomor))}<\x2fdiv><\x2fdiv>
       <h4 class="mt3 mb2">Isian dan labelnya<\x2fh4><p class="xs muted mb2">Ubah label sesuai format sekolah. Hapus centang <b>Cetak<\x2fb> untuk menyembunyikan isian; isian a., b., dan baris tambahan di bawahnya ikut tersembunyi. Nomor urut menyesuaikan otomatis.<\x2fp>
-      <div class="tw"><table class="tbl"><thead><tr><th style="width:64px">No<\x2fth><th>Label<\x2fth><th style="width:70px;text-align:center">Cetak<\x2fth><th style="width:110px">Sumber data<\x2fth><\x2ftr><\x2fthead><tbody>${baris}<\x2ftbody><\x2ftable><\x2fdiv><\x2fdiv>`;
+      <div class="tw"><table class="tbl"><thead><tr><th style="width:64px">No<\x2fth><th>Label<\x2fth><th style="width:70px;text-align:center">Cetak<\x2fth><th style="width:110px">Sumber data<\x2fth><\x2ftr><\x2fthead><tbody>${baris}<\x2ftbody><\x2ftable><\x2fdiv><\x2fdiv>
+    <div class="card mt3"><h3 class="mb2">Margin tiap lembar (cm)<\x2fh3><p class="xs muted mb2">Terpisah dari margin rapor. Ukuran kertas dan jenis huruf tetap mengikuti menu Tata Cetak Rapor. Bila isi sebuah lembar melebihi satu halaman, pratinjau menandainya dengan garis merah.<\x2fp>
+      <div class="tw"><table class="tbl"><thead><tr><th>Lembar<\x2fth><th>Atas<\x2fth><th>Bawah<\x2fth><th>Kiri<\x2fth><th>Kanan<\x2fth><\x2ftr><\x2fthead><tbody>${ID_HAL.map(x => `<tr><td><b>${x[1]}<\x2fb><\x2ftd>${['atas', 'bawah', 'kiri', 'kanan'].map(sisi => `<td><input class="in idnMg" type="number" min="0" max="8" step="0.1" data-h="${x[0]}" data-s="${sisi}" value="${c.margin[x[0]][sisi]}" style="width:92px" aria-label="Margin ${sisi} ${x[1]}"><\x2ftd>`).join('')}<\x2ftr>`).join('')}<\x2ftbody><\x2ftable><\x2fdiv><\x2fdiv>`;
+  idnMuatLogo();
   $('#idnIsi').addEventListener('input', () => { if (S.ui.I && S.ui.I.tab === 'atur') { S.ui.I.aturKotor = true; tandaiIdn(); } });
   $('#idnIsi').addEventListener('change', () => { if (S.ui.I && S.ui.I.tab === 'atur') { S.ui.I.aturKotor = true; tandaiIdn(); } });
 }
@@ -2036,13 +2061,45 @@ Object.assign(AKSI, {
     I.baris.forEach(b => { const a = I.asli[b.id_siswa] || {}; I.dataK.forEach(x => { b['d_' + x.k] = a[x.k] === undefined ? '' : String(a[x.k]); }); });
     I.kotor = false; tandaiIdn(); renderIdnData();
   },
+  idnLogoUnggah() {
+    if (S.ui.I.aturKotor) { toast('Simpan pengaturan dulu sebelum mengunggah logo, agar perubahan teks tidak hilang.', 'warn', 6000); return; }
+    const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image\x2fpng,image\x2fjpeg';
+    inp.onchange = async () => {
+      const f = inp.files[0]; if (!f) return;
+      if (['image\x2fpng', 'image\x2fjpeg'].indexOf(f.type) < 0) { toast('Logo harus PNG atau JPEG.', 'warn'); return; }
+      try {
+        const g = await kecilkanGambar(f, 2400, f.type, 0.92);
+        if (g.kb > 2048) { toast(`Logo terlalu besar (${g.kb} KB). Maksimal 2048 KB \u2014 perkecil berkasnya dulu.`, 'warn', 7000); return; }
+        const cm = S.ui.I.d.cfg.sampul.logoCm || 8, dpi = Math.round(g.w / (cm / 2.54));
+        if (dpi < 200) toast(`Resolusi logo ${g.w} px (\u00b1${dpi} dpi pada lebar ${cm} cm) mungkin kurang tajam. Disarankan minimal ${Math.ceil(cm / 2.54 * 300)} px.`, 'warn', 9000);
+        const id = await unggahDenganPratinjau('logo_sampul', '', g, 'Logo sampul');
+        if (id) { Cache.hapus('ihtml_'); await buka('identitas', { id_kelas: S.ui.I.id, tab: 'atur' }, { tanpaRiwayat: true }); }
+      } catch (e) { galat(e); }
+    };
+    inp.click();
+  },
+  async idnLogoHapus(t) {
+    if (S.ui.I.aturKotor) { toast('Simpan pengaturan dulu sebelum menghapus logo.', 'warn'); return; }
+    if (!(await konfirmasi({ judul: 'Hapus logo sampul?', pesan: 'Sampul kembali memakai logo sekolah dari Pengaturan.', ya: 'Hapus' }))) return;
+    await proses(t, async () => {
+      try {
+        const r = await Api.panggil('simpanData', 'hapusBerkas', { jenis: 'logo_sampul' });
+        if (!r.ok) throw new ApiGalat(r);
+        Cache.hapus('ihtml_'); toast('Logo sampul dihapus.');
+        await buka('identitas', { id_kelas: S.ui.I.id, tab: 'atur' }, { tanpaRiwayat: true });
+      } catch (e) { galat(e); }
+    }, 'Menghapus\u2026');
+  },
   idnAturAwal() { renderIdnAtur(S.ui.I.d.cfgAwal); S.ui.I.aturKotor = true; tandaiIdn(); toast('Teks bawaan dimuat. Klik Simpan pengaturan untuk menerapkan.', 'info', 6000); },
   async idnAturSimpan(t) {
     const I = S.ui.I, v = id => ($('#' + id) || {}).value || '', label = {}, sembunyi = [];
     $$('.idnLbl').forEach(x => { const b = I.d.bidang.find(y => y.k === x.dataset.k), isi = x.value.trim(); if (b && isi && isi !== b.labelAwal) label[b.k] = isi; });
     $$('.idnTampil').forEach(x => { if (!x.checked) sembunyi.push(x.dataset.k); });
+    const angkaAtau = (x, d) => { const n = parseFloat(String(x).replace(',', '.')); return isFinite(n) ? n : d; }, margin = {};
+    $$('.idnMg').forEach(x => { (margin[x.dataset.h] = margin[x.dataset.h] || {})[x.dataset.s] = angkaAtau(x.value, I.d.cfg.margin[x.dataset.h][x.dataset.s]); });
     const cfg = {
-      sampul: { atas: v('ia_sampul_atas'), labelNama: v('ia_sampul_labelNama'), labelNisn: v('ia_sampul_labelNisn'), bawah: v('ia_sampul_bawah'), logo: !!($('#ia_sampul_logo') || {}).checked },
+      sampul: { atas: v('ia_sampul_atas'), labelNama: v('ia_sampul_labelNama'), labelNisn: v('ia_sampul_labelNisn'), bawah: v('ia_sampul_bawah'), logo: !!($('#ia_sampul_logo') || {}).checked, logoCm: angkaAtau(v('ia_sampul_logoCm'), I.d.cfg.sampul.logoCm) },
+      margin,
       sekolah: { judul: v('ia_sekolah_judul'), rincian: v('ia_sekolah_rincian') },
       siswa: { judul: v('ia_siswa_judul'), kosong: v('ia_siswa_kosong'), foto: v('ia_siswa_foto'), tempatTanggal: v('ia_siswa_tempatTanggal').trim(), jabatan: v('ia_siswa_jabatan').trim(), nama: v('ia_siswa_nama').trim(), nomor: v('ia_siswa_nomor').trim(), label, sembunyi }
     };
