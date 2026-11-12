@@ -377,6 +377,7 @@ const HAL = {
   pratinjau: { judul: 'Pratinjau', induk: () => (S.param && S.param.jenis === 'pts' ? 'pts' : S.param && S.param.jenis === 'identitas' ? 'identitas' : 'rapor'), r: (el, p) => hPratinjau(el, p) },
   pts: { judul: 'Rapor Tengah Semester', ikon: 'clipboard-data', r: (el, p) => hPts(el, p) },
   identitas: { judul: 'Identitas Rapor', ikon: 'person-vcard', r: (el, p) => hIdentitas(el, p) },
+  imporsiswa: { judul: 'Wizard Data Siswa', ikon: 'magic', r: (el, p) => hImporSiswa(el, p) },
   cetak: { judul: 'Tata Cetak Rapor', ikon: 'printer', sa: true, r: (el, p) => hCetak(el, p) },
   tampilan: { judul: 'Halaman Login', ikon: 'door-open', sa: true, r: el => hTampilan(el) },
   rekap: { judul: 'Pencarian & Rekap', ikon: 'search', r: (el, p) => hRekap(el, p) },
@@ -393,7 +394,7 @@ const indukHal = k => { const i = HAL[k].induk; return (typeof i === 'function' 
 const judulHal = k => { const j = HAL[k].judul; return typeof j === 'function' ? j() : j; };
 const isWali = () => S.waliKelas.length > 0;
 function menuPeran() {
-  if (S.me.isSA) return [['Menu utama', ['dashboard', 'nilai', 'kelasku', 'rapor', 'identitas', 'rekap', 'pts']], ['Data master', ['siswa', 'kelas', 'mapel', 'ekskul']], ['Sistem', ['akun', 'pengaturan', 'cetak', 'tampilan', 'log', 'profil']]];
+  if (S.me.isSA) return [['Menu utama', ['dashboard', 'nilai', 'kelasku', 'rapor', 'identitas', 'rekap', 'pts']], ['Data master', ['siswa', 'imporsiswa', 'kelas', 'mapel', 'ekskul']], ['Sistem', ['akun', 'pengaturan', 'cetak', 'tampilan', 'log', 'profil']]];
   return isWali() ? [['Kelas perwalian', ['dashboard', 'nilai', 'kelasku', 'rapor', 'identitas', 'rekap', 'pts']], ['Akun', ['profil']]] : [['Menu utama', ['dashboard']], ['Akun', ['profil']]];
 }
 function izin(hal) {
@@ -418,7 +419,7 @@ function renderShell() {
   chip.innerHTML = `${S.kunci ? ic('lock-fill') : '<span class="dot"><\x2fspan>'}<span>TA ${h(S.ta)} \u00b7 ${h(S.sem)}${S.kunci ? ' \u00b7 Terkunci' : ''}<\x2fspan>`;
   $('#lockBanner').hidden = !(S.kunci && !S.me.isSA);
   $$('.js-sekolah').forEach(e => { e.textContent = S.set.nama_sekolah || 'SMK Muhammadiyah 1 Sangatta'; });
-  $$('.js-app').forEach(e => { e.textContent = S.set.nama_aplikasi || 'Erapor SMK'; });
+  $$('.js-app').forEach(e => { e.textContent = S.set.nama_aplikasi || 'RaporMu'; });
   $$('.js-appsub').forEach(e => { e.textContent = S.set.subjudul_aplikasi || S.set.nama_sekolah || ''; });
   $('#guideTeks').textContent = S.me.isSA ? 'Alur input nilai, data wali kelas, kunci periode, dan cetak rapor.' : 'Cara meninjau & merevisi nilai, catatan wali, dan cetak rapor.';
   if (S.set.file_logo) gambar(S.set.file_logo).then(u => { if (u) $('#sideLogo').innerHTML = `<img src="${u}" alt="Logo sekolah">`; });
@@ -437,7 +438,7 @@ async function buka(hal, param = {}, o = {}) {
   $$('.page').forEach(p => p.classList.toggle('aktif', p.id === 'pg-' + hal));
   const aktif = indukHal(hal);
   $$('#nav button[data-hal]').forEach(b => { const on = b.dataset.hal === aktif; b.classList.toggle('aktif', on); if (on) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
-  document.title = judulHal(hal) + ' \u00b7 ' + (S.set.nama_aplikasi || 'Erapor SMK');
+  document.title = judulHal(hal) + ' \u00b7 ' + (S.set.nama_aplikasi || 'RaporMu');
   tutupMenu();
   window.scrollTo(0, 0);
   const el = $('#pg-' + hal);
@@ -510,7 +511,7 @@ const waLink = n => { let d = String(n || '').replace(/\D/g, ''); if (d.startsWi
 const IKON_FITUR = ['clipboard-check', 'printer', 'shield-check', 'stars'];
 function terapkanLogin(root, c, aset = {}) {
   if (!root || !c) return;
-  const q = k => root.querySelector(`[data-lg="${k}"]`), app = (S.set && S.set.nama_aplikasi) || (window.__AWAL__ || {}).app || 'Erapor SMK';
+  const q = k => root.querySelector(`[data-lg="${k}"]`), app = (S.set && S.set.nama_aplikasi) || (window.__AWAL__ || {}).app || 'RaporMu';
   const isi = (k, t) => { const e = q(k); if (e) { e.textContent = t; e.hidden = !t; } };
   isi('judul', c.judul); isi('deskripsi', c.deskripsi); isi('label', c.label); isi('formSub', c.formSub);
   const fj = q('formJudul'); if (fj) fj.textContent = (c.formJudul || 'Masuk ke {aplikasi}').replace(/\{aplikasi\}/gi, app);
@@ -535,7 +536,7 @@ function terapkanLogin(root, c, aset = {}) {
 function tampilLogin() {
   $('#vApp').hidden = true; $('#vLogin').hidden = false; $('#boot').hidden = true;
   $('#formLogin').hidden = false; $('#formGantiWajib').hidden = true;
-  document.title = 'Masuk \u00b7 Erapor SMK';
+  document.title = 'Masuk \u00b7 ' + ((S.set && S.set.nama_aplikasi) || (window.__AWAL__ || {}).app || 'RaporMu');
   setTimeout(() => { if (!$('#formLogin').contains(document.activeElement)) $('#lgUser').focus(); }, 60);
 }
 function alertLogin(jenis, pesan, el) {
@@ -2112,6 +2113,253 @@ Object.assign(AKSI, {
         await buka('identitas', { id_kelas: I.id, tab: 'atur' }, { tanpaRiwayat: true });
       } catch (e) { galat(e); }
     }, 'Menyimpan\u2026');
+  }
+});
+
+const DPK_KOLOM = {
+  nisn: ['NISN'], nis: ['NIPD', 'NIS', 'NOMORINDUK', 'NOMORINDUKSISWA'], nama_lengkap: ['NAMA', 'NAMALENGKAP', 'NAMAPESERTADIDIK', 'NAMASISWA'],
+  jenis_kelamin: ['JENISKELAMIN', 'JK', 'LP'], tempat_lahir: ['TEMPATLAHIR'], tanggal_lahir: ['TANGGALLAHIR', 'TGLLAHIR'], agama: ['AGAMA'],
+  alamat: ['ALAMAT', 'ALAMATJALAN'], rt: ['RT'], rw: ['RW'], dusun: ['DUSUN'], kelurahan: ['KELURAHAN', 'DESAKELURAHAN', 'KELURAHANDESA'], kecamatan: ['KECAMATAN'], kodepos: ['KODEPOS'],
+  telepon: ['TELEPON', 'TELP'], hp: ['HP', 'NOHP', 'NOMORHP'], email: ['EMAIL'], skhun: ['SKHUN'],
+  nama_ayah: ['DATAAYAHNAMA', 'NAMAAYAH'], kerja_ayah: ['DATAAYAHPEKERJAAN', 'PEKERJAANAYAH'], nama_ibu: ['DATAIBUNAMA', 'NAMAIBU', 'NAMAIBUKANDUNG'], kerja_ibu: ['DATAIBUPEKERJAAN', 'PEKERJAANIBU'],
+  nama_wali: ['DATAWALINAMA', 'NAMAWALI'], kerja_wali: ['DATAWALIPEKERJAAN', 'PEKERJAANWALI'],
+  rombel: ['ROMBELSAATINI', 'ROMBEL', 'ROMBONGANBELAJAR', 'KELAS'], ijazah_nomor: ['NOSERIIJAZAH', 'NOMORSERIIJAZAH'], asal_nama: ['SEKOLAHASAL'], anak_ke: ['ANAKKEBERAPA', 'ANAKKE']
+};
+const DPK_INTI = [['nama_lengkap', 'Nama'], ['nis', 'NIS (NIPD)'], ['jenis_kelamin', 'Jenis kelamin'], ['tempat_lahir', 'Tempat lahir'], ['tanggal_lahir', 'Tanggal lahir'], ['agama', 'Agama'], ['alamat', 'Alamat'], ['nama_ayah', 'Nama ayah'], ['nama_ibu', 'Nama ibu']];
+const DPK_IDN = [['anak_ke', 'Anak ke-', ['anak_ke']], ['telp', 'Nomor telepon/HP', ['hp', 'telepon']], ['email', 'Email', ['email']], ['asal_nama', 'Sekolah asal', ['asal_nama']], ['skhun_nomor', 'Nomor SKHUN', ['skhun']],
+  ['ijazah_nomor', 'Nomor seri ijazah', ['ijazah_nomor']], ['kerja_ayah', 'Pekerjaan ayah', ['kerja_ayah']], ['kerja_ibu', 'Pekerjaan ibu', ['kerja_ibu']], ['nama_wali', 'Nama wali', ['nama_wali']], ['kerja_wali', 'Pekerjaan wali', ['kerja_wali']]];
+const DPK_ALAMAT = [['rt', 'RT/RW'], ['dusun', 'Dusun'], ['kelurahan', 'Kelurahan'], ['kecamatan', 'Kecamatan'], ['kodepos', 'Kode pos']];
+const DPK_AGAMA = { ISLAM: 'Islam', KRISTEN: 'Kristen', PROTESTAN: 'Kristen', KRISTENPROTESTAN: 'Kristen', KATOLIK: 'Katolik', KATHOLIK: 'Katolik', KRISTENKATOLIK: 'Katolik', HINDU: 'Hindu', BUDHA: 'Buddha', BUDDHA: 'Buddha', KONGHUCU: 'Konghucu', KHONGHUCU: 'Konghucu', KONGHUCHU: 'Konghucu' };
+const DPK_BULAN = { JANUARI: 1, FEBRUARI: 2, MARET: 3, APRIL: 4, MEI: 5, JUNI: 6, JULI: 7, AGUSTUS: 8, SEPTEMBER: 9, OKTOBER: 10, NOVEMBER: 11, DESEMBER: 12 };
+const DPK_TEMPLAT = ['No', 'Nama', 'NIPD', 'Jenis Kelamin', 'NISN', 'Tempat Lahir', 'Tanggal Lahir', 'NIK', 'Agama', 'Alamat', 'RT', 'RW', 'Dusun', 'Kelurahan', 'Kecamatan', 'Kode Pos',
+  'Jenis Tinggal', 'Alat Transportasi', 'Telepon', 'HP', 'E-Mail', 'SKHUN', 'Penerima KPS', 'No. KPS', ['Data Ayah'], ['Data Ibu'], ['Data Wali'], 'Rombel Saat Ini', 'No Peserta Ujian Nasional',
+  'No Seri Ijazah', 'Penerima KIP', 'Nomor KIP', 'Nama di KIP', 'Nomor KKS', 'No Registrasi Akta Lahir', 'Bank', 'Nomor Rekening Bank', 'Rekening Atas Nama', 'Layak PIP (usulan dari sekolah)',
+  'Alasan Layak PIP', 'Kebutuhan Khusus', 'Sekolah Asal', 'Anak ke-berapa', 'Lintang', 'Bujur', 'No KK', 'Berat Badan', 'Tinggi Badan', 'Lingkar Kepala', 'Jml. Saudara\nKandung', 'Jarak Rumah\nke Sekolah (KM)'];
+const DPK_SUB = ['Nama', 'Tahun Lahir', 'Jenjang Pendidikan', 'Pekerjaan', 'Penghasilan', 'NIK'];
+const dpkHuruf = i => { let x = ''; for (i++; i; i = Math.floor((i - 1) / 26)) x = String.fromCharCode(65 + ((i - 1) % 26)) + x; return x; };
+const dpkTeks = v => (v == null || typeof v === 'object' ? '' : String(v).replace(/^'/, '').trim());
+function dpkTanggal(v) {
+  if (typeof v === 'number' && isFinite(v) && v > 0) { const d = new Date(Math.round((v - 25569) * 86400000)); return isNaN(d.getTime()) ? String(v) : d.toISOString().slice(0, 10); }
+  const t = dpkTeks(v);
+  let m;
+  if (!t) return '';
+  if ((m = /^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(t))) return `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`;
+  if ((m = /^(\d{1,2})[\x2f.-](\d{1,2})[\x2f.-](\d{4})$/.exec(t))) return `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
+  if ((m = /^(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})$/.exec(t)) && DPK_BULAN[m[2].toUpperCase()]) return `${m[3]}-${String(DPK_BULAN[m[2].toUpperCase()]).padStart(2, '0')}-${m[1].padStart(2, '0')}`;
+  return t;
+}
+function bacaDapodik(sheets) {
+  for (const sh of sheets) {
+    for (let r = 0; r <= Math.min(sh.maxR, 25); r++) {
+      const atas = sh.sel[r] || {}, kN = Object.keys(atas).find(c => normM(atas[c]) === 'NISN');
+      if (kN === undefined) continue;
+      const bawah = sh.sel[r + 1] || {};
+      const adaSub = Object.keys(bawah).length > 0 && dpkTeks(bawah[kN]) === '' && !Object.values(bawah).some(x => typeof x === 'number');
+      const label = {};
+      let grup = '';
+      for (let c = 0; c <= sh.maxC; c++) {
+        const a = dpkTeks(atas[c]), b = adaSub ? dpkTeks(bawah[c]) : '';
+        if (a) grup = a;
+        label[c] = b ? (a || grup) + ' ' + b : a;
+      }
+      const kol = {};
+      Object.keys(DPK_KOLOM).forEach(k => { for (let c = 0; c <= sh.maxC; c++) if (label[c] && DPK_KOLOM[k].indexOf(normM(label[c])) > -1) { kol[k] = c; break; } });
+      if (kol.nama_lengkap === undefined) throw new Error('Kolom "Nama" tidak ditemukan di samping kolom NISN (sheet ' + sh.nama + ').');
+      const data = [];
+      for (let rr = r + (adaSub ? 2 : 1); rr <= sh.maxR; rr++) {
+        const x = sh.sel[rr];
+        if (x && Object.values(x).some(v => dpkTeks(v) !== '')) data.push({ baris: rr + 1, x });
+      }
+      return { sheet: sh.nama, barisJudul: r + 1, label, kol, data };
+    }
+  }
+  throw new Error('Kolom NISN tidak ditemukan. Pastikan berkas adalah ekspor "Daftar Peserta Didik" dari Dapodik atau templat dari wizard ini.');
+}
+function dpkBaris(W) {
+  const o = W.opsi, kol = W.berkas.kol, nol = v => !v || /^0+$/.test(v);
+  return W.berkas.data.map(d => {
+    const g = k => (kol[k] === undefined ? '' : d.x[kol[k]]), t = k => dpkTeks(g(k));
+    const rtRw = [nol(t('rt')) ? '' : 'RT ' + t('rt'), nol(t('rw')) ? '' : 'RW ' + t('rw')].filter(Boolean).join('\x2f');
+    const alamat = [t('alamat'), o.alamat.rt ? rtRw : '', o.alamat.dusun && t('dusun') ? 'Dusun ' + t('dusun') : '', o.alamat.kelurahan && t('kelurahan') ? 'Kel. ' + t('kelurahan') : '',
+      o.alamat.kecamatan && t('kecamatan') ? 'Kec. ' + t('kecamatan') : '', o.alamat.kodepos ? t('kodepos') : ''].filter(Boolean).join(', ');
+    return {
+      baris: d.baris, nisn: typeof g('nisn') === 'number' ? String(Math.round(g('nisn'))).padStart(10, '0') : t('nisn').replace(/\s/g, ''),
+      nama_lengkap: t('nama_lengkap'), nis: t('nis'), jenis_kelamin: t('jenis_kelamin').toUpperCase().charAt(0), tempat_lahir: t('tempat_lahir'), tanggal_lahir: dpkTanggal(g('tanggal_lahir')),
+      agama: DPK_AGAMA[normM(t('agama'))] || t('agama'), alamat, nama_ayah: t('nama_ayah'), nama_ibu: t('nama_ibu'), rombel: t('rombel'),
+      idn: { anak_ke: t('anak_ke'), telp: t('hp') || t('telepon'), email: t('email'), asal_nama: t('asal_nama'), skhun_nomor: t('skhun'), ijazah_nomor: t('ijazah_nomor'),
+        kerja_ayah: t('kerja_ayah'), kerja_ibu: t('kerja_ibu'), nama_wali: t('nama_wali'), kerja_wali: t('kerja_wali') }
+    };
+  });
+}
+function dpkRombel(W) {
+  const n = {};
+  W.berkas.data.forEach(d => { const r = W.berkas.kol.rombel === undefined ? '' : dpkTeks(d.x[W.berkas.kol.rombel]); if (r) n[r] = (n[r] || 0) + 1; });
+  return Object.keys(n).sort((a, b) => a.localeCompare(b, 'id', { numeric: true })).map(r => ({ rombel: r, n: n[r] }));
+}
+const dpkCocokKelas = r => { const n = normM(r), k = (S.kelas || []).find(x => normM(x.nama_kelas) === n || normM(singkat(x.nama_kelas)) === n); return k ? k.id_kelas : ''; };
+const wzOpsiServer = W => ({ perbarui: W.opsi.perbarui, kosongTimpa: W.opsi.kosongTimpa, urutAbjad: W.opsi.urutAbjad, bidang: W.opsi.bidang, identitas: W.opsi.identitas,
+  kelas: Object.fromEntries(Object.entries(W.opsi.kelas).filter(x => x[1])), namaBerkas: W.berkas.nama });
+
+async function hImporSiswa(el) {
+  if (!S.me.isSA) { el.innerHTML = ph({ crumb: ['Wizard Data Siswa'], judul: 'Wizard data siswa' }) + `<div class="card">${kosong('Khusus Super Admin', 'Menu ini hanya untuk Super Admin.', '', 'lock')}<\x2fdiv>`; return; }
+  if (!S.ui.W) S.ui.W = { langkah: 1 };
+  renderImporSiswa(el);
+}
+function renderImporSiswa(el) {
+  el = el || $('#pg-imporsiswa');
+  const W = S.ui.W, langkah = [['Unggah berkas', 'cloud-arrow-up'], ['Atur impor', 'sliders'], ['Periksa', 'clipboard-check'], ['Selesai', 'check2-circle']];
+  el.innerHTML = ph({ crumb: ['Data master', 'Wizard Data Siswa'], judul: 'Wizard data siswa', sub: 'Impor dan perbarui data siswa dari ekspor Dapodik (Daftar Peserta Didik) dalam empat langkah. Tidak ada yang disimpan sebelum langkah terakhir.' }) +
+    `<div class="card mb3"><div class="row" style="gap:10px;flex-wrap:wrap;align-items:center">${langkah.map((x, i) => { const n = i + 1; return `<span class="pill ${n < W.langkah ? 'p-mint' : n === W.langkah ? 'p-lav' : 'p-gray'}">${ic(n < W.langkah ? 'check-circle-fill' : x[1])} ${n}. ${x[0]}<\x2fspan>`; }).join(`<span class="muted">${ic('chevron-right')}<\x2fspan>`)}<\x2fdiv><\x2fdiv><div id="wzIsi"><\x2fdiv>`;
+  if (W.langkah === 2) wzLangkah2(); else if (W.langkah === 3) wzLangkah3(); else if (W.langkah === 4) wzLangkah4(); else wzLangkah1();
+}
+function wzLangkah1() {
+  $('#wzIsi').innerHTML = `<div class="g c2">
+    <div class="card"><h3 class="mb2">Unggah berkas Excel<\x2fh3>
+      <label class="dz" id="wzDz"><input type="file" id="wzFile" accept=".xlsx,.xlsm" hidden>${ic('cloud-arrow-up')}<b>Pilih atau seret berkas Excel (.xlsx) ke sini<\x2fb><span class="xs muted">Ekspor Dapodik \u201cDaftar Peserta Didik\u201d atau templat dari wizard ini<\x2fspan><\x2flabel>
+      <div id="wzGalat" class="mt2"><\x2fdiv><\x2fdiv>
+    <div class="card"><h3 class="mb2">Cara memakai<\x2fh3><ol class="sm" style="padding-left:18px;line-height:1.75;margin:0">
+      <li>Di <b>Dapodik<\x2fb>, unduh daftar peserta didik dalam format Excel (.xlsx), atau isi templat di bawah.<\x2fli>
+      <li>Unggah berkasnya di sini. Kolom dikenali otomatis dari judulnya; kolom lain di berkas diabaikan.<\x2fli>
+      <li>Pilih data yang diisi dan kelas tujuan, lalu <b>Periksa data<\x2fb>. Belum ada yang disimpan.<\x2fli>
+      <li>Tinjau hasil pemeriksaan per siswa, lalu <b>Simpan<\x2fb>.<\x2fli><\x2fol>
+      <button class="btn btn-out mt3" data-aksi="wzTemplat">${ic('download')} Unduh templat (format Dapodik)<\x2fbutton><\x2fdiv><\x2fdiv>`;
+  const dz = $('#wzDz'), inp = $('#wzFile');
+  inp.addEventListener('change', () => { if (inp.files[0]) wzMuat(inp.files[0]); });
+  dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('over'); });
+  dz.addEventListener('dragleave', () => dz.classList.remove('over'));
+  dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('over'); if (e.dataTransfer.files[0]) wzMuat(e.dataTransfer.files[0]); });
+}
+async function wzMuat(f) {
+  const W = S.ui.W, g = $('#wzGalat');
+  try {
+    g.innerHTML = `<div class="xs muted">Membaca berkas\u2026<\x2fdiv>`;
+    const b = bacaDapodik(await bacaXlsx(f));
+    if (!b.data.length) throw new Error('Berkas tidak berisi baris data siswa di bawah judul kolom.');
+    W.berkas = Object.assign(b, { nama: f.name });
+    const ada = k => b.kol[k] !== undefined;
+    W.opsi = { perbarui: true, kosongTimpa: false, urutAbjad: false, alamat: { rt: true, dusun: true, kelurahan: true, kecamatan: true, kodepos: true }, kelas: {},
+      bidang: DPK_INTI.filter(x => ada(x[0])).map(x => x[0]), identitas: DPK_IDN.filter(x => x[2].some(ada)).map(x => x[0]) };
+    dpkRombel(W).forEach(r => { W.opsi.kelas[r.rombel] = dpkCocokKelas(r.rombel); });
+    W.langkah = 2; W.uji = null; W.hasil = null;
+    renderImporSiswa();
+  } catch (e) { g.innerHTML = `<div class="al al-err">${ic('exclamation-triangle')}<div>${h(e.message)}<\x2fdiv><\x2fdiv>`; }
+}
+function wzLangkah2() {
+  const W = S.ui.W, b = W.berkas, o = W.opsi, ada = k => b.kol[k] !== undefined, rombel = dpkRombel(W);
+  const asal = k => (ada(k) ? `<span class="xs muted">kolom ${dpkHuruf(b.kol[k])} \u00b7 ${h(b.label[b.kol[k]])}<\x2fspan>` : '<span class="xs c-warn">tidak ada di berkas<\x2fspan>');
+  const cek = (grup, k, label, sumber) => { const ok = sumber.some(ada); return `<label class="row" style="gap:8px;align-items:flex-start;padding:3px 0"><input type="checkbox" class="wzCek" data-grup="${grup}" value="${k}" ${ok && o[grup].indexOf(k) > -1 ? 'checked' : ''} ${ok ? '' : 'disabled'}><span><b>${label}<\x2fb> ${asal(sumber.find(ada) || sumber[0])}<\x2fspan><\x2flabel>`; };
+  $('#wzIsi').innerHTML = `<div class="card mb3"><div class="row between" style="flex-wrap:wrap;gap:10px;align-items:center"><div><b>${h(b.nama)}<\x2fb><div class="xs muted">Sheet \u201c${h(b.sheet)}\u201d \u00b7 judul kolom di baris ${b.barisJudul} \u00b7 <b>${b.data.length} baris data<\x2fb> \u00b7 NISN dari kolom ${dpkHuruf(b.kol.nisn)} dipakai mencocokkan siswa yang sudah ada<\x2fdiv><\x2fdiv><button class="btn btn-out btn-sm" data-aksi="wzUlang">${ic('arrow-counterclockwise')} Ganti berkas<\x2fbutton><\x2fdiv><\x2fdiv>
+    <div class="g c2">
+      <div class="card"><h3 class="mb2">Data siswa<\x2fh3>${DPK_INTI.map(x => cek('bidang', x[0], x[1], [x[0]])).join('')}
+        ${ada('alamat') ? `<div class="mt2"><div class="xs muted mb1">Susun alamat dari kolom Alamat ditambah:<\x2fdiv><div class="row" style="gap:12px;flex-wrap:wrap">${DPK_ALAMAT.map(x => `<label class="row" style="gap:6px"><input type="checkbox" class="wzAlamat" value="${x[0]}" ${o.alamat[x[0]] ? 'checked' : ''} ${(x[0] === 'rt' ? ['rt', 'rw'] : [x[0]]).some(ada) ? '' : 'disabled'}> ${x[1]}<\x2flabel>`).join('')}<\x2fdiv><div class="xs mt1">Contoh baris pertama: <b id="wzContohAlamat">${h(dpkBaris(W)[0].alamat || '-')}<\x2fb><\x2fdiv><\x2fdiv>` : ''}<\x2fdiv>
+      <div class="card"><h3 class="mb2">Data identitas rapor<\x2fh3><p class="xs muted mb2">Mengisi menu Identitas Rapor \u2192 Data Peserta Didik.<\x2fp>${DPK_IDN.map(x => cek('identitas', x[0], x[1], x[2])).join('')}<\x2fdiv><\x2fdiv>
+    <div class="g c2 mt3">
+      <div class="card"><h3 class="mb2">Siswa yang sudah ada (NISN sama)<\x2fh3>
+        <label class="row" style="gap:8px"><input type="radio" name="wzPerbarui" value="1" ${o.perbarui ? 'checked' : ''}> Perbarui datanya dengan isi berkas<\x2flabel>
+        <label class="row mt1" style="gap:8px"><input type="radio" name="wzPerbarui" value="0" ${o.perbarui ? '' : 'checked'}> Lewati, jangan diubah<\x2flabel>
+        <label class="row mt2" style="gap:8px"><input type="checkbox" id="wzKosong" ${o.kosongTimpa ? 'checked' : ''}> Sel kosong di berkas ikut mengosongkan data lama<\x2flabel>
+        <p class="xs muted mt1">Bila tidak dicentang, sel kosong dilewati sehingga data lama tetap utuh. Nama dan jenis kelamin tidak pernah dikosongkan.<\x2fp><\x2fdiv>
+      <div class="card"><h3 class="mb2">Rombel \u2192 kelas (TA ${h(S.ta)})<\x2fh3>${rombel.length ? `<p class="xs muted mb2">Hanya siswa aktif yang belum punya kelas di tahun ajaran ini yang dimasukkan. Siswa di kelas lain tidak dipindah (pindah kelas lewat menu Kelas &amp; Anggota).<\x2fp>
+        <div class="tw"><table class="tbl"><thead><tr><th>Rombel di berkas<\x2fth><th>Siswa<\x2fth><th>Masukkan ke kelas<\x2fth><\x2ftr><\x2fthead><tbody>${rombel.map((r, i) => `<tr><td><b>${h(r.rombel)}<\x2fb><\x2ftd><td>${r.n}<\x2ftd><td><select class="in wzKelas" data-i="${i}" style="min-width:220px" aria-label="Kelas untuk ${h(r.rombel)}">${opsi([['', '\u2014 Jangan masukkan ke kelas \u2014']].concat((S.kelas || []).map(k => [k.id_kelas, k.nama_kelas])), o.kelas[r.rombel] || '')}<\x2fselect><\x2ftd><\x2ftr>`).join('')}<\x2ftbody><\x2ftable><\x2fdiv>
+        <label class="row mt2" style="gap:8px"><input type="checkbox" id="wzUrut" ${o.urutAbjad ? 'checked' : ''}> Urutkan ulang nomor absen kelas tujuan menurut abjad<\x2flabel>` : `<p class="xs muted">${ada('rombel') ? 'Kolom rombel kosong di semua baris.' : 'Berkas tidak punya kolom rombel; siswa tidak dimasukkan ke kelas.'}<\x2fp>`}<\x2fdiv><\x2fdiv>
+    <div class="row between mt3"><button class="btn btn-out" data-aksi="wzUlang">${ic('arrow-left')} Kembali<\x2fbutton><button class="btn btn-dark" data-aksi="wzPeriksa">${ic('clipboard-check')} Periksa data<\x2fbutton><\x2fdiv>`;
+  $('#wzIsi').addEventListener('change', e => {
+    wzBacaOpsi();
+    if (e.target.classList.contains('wzAlamat')) { const c = $('#wzContohAlamat'); if (c) c.textContent = dpkBaris(W)[0].alamat || '-'; }
+  });
+}
+function wzBacaOpsi() {
+  const W = S.ui.W, o = W.opsi, rb = dpkRombel(W);
+  o.bidang = $$('.wzCek[data-grup="bidang"]').filter(x => x.checked).map(x => x.value);
+  o.identitas = $$('.wzCek[data-grup="identitas"]').filter(x => x.checked).map(x => x.value);
+  $$('.wzAlamat').forEach(x => { o.alamat[x.value] = x.checked; });
+  const p = $('input[name="wzPerbarui"]:checked');
+  o.perbarui = !p || p.value === '1';
+  o.kosongTimpa = !!($('#wzKosong') || {}).checked;
+  o.urutAbjad = !!($('#wzUrut') || {}).checked;
+  $$('.wzKelas').forEach(x => { o.kelas[rb[+x.dataset.i].rombel] = x.value; });
+}
+const WZ_STATUS = { baru: ['Baru', 'p-mint'], ubah: ['Diperbarui', 'p-lav'], sama: ['Tanpa perubahan', 'p-gray'], lewati: ['Dilewati', 'p-gray'], galat: ['Galat', 'p-danger'] };
+function wzTabel(d) {
+  const W = S.ui.W, data = d.baris.filter(x => !W.filter || W.filter === 'semua' || x.status === W.filter);
+  new Tabel($('#wzTabel'), {
+    data, idKey: 'baris', ukuran: 50, cari: ['nama', 'nisn'], kosong: 'Tidak ada baris.', kolom: [
+      { k: 'baris', label: 'Baris', r: x => `<span class="mono">${x.baris}<\x2fspan>` },
+      { k: 'nama', label: 'Siswa', r: x => `<b>${h(x.nama || '-')}<\x2fb><br><small class="mono muted">${h(x.nisn || '-')}<\x2fsmall>` },
+      { k: 'status', label: 'Status', r: x => `<span class="pill sm ${WZ_STATUS[x.status][1]}">${WZ_STATUS[x.status][0]}<\x2fspan>` },
+      { k: '', label: 'Rincian', urut: false, r: x => (x.status === 'galat' ? `<span class="c-err">${h(x.alasan)}<\x2fspan>`
+        : ((x.perubahan || []).map(p => `<div class="xs">${h(p)}<\x2fdiv>`).join('') + (x.catatan ? `<div class="xs c-warn">${h(x.catatan)}<\x2fdiv>` : '')) || '<span class="xs muted">-<\x2fspan>') }
+    ]
+  }).render();
+}
+function wzKpi(r) {
+  return [kpi({ ikon: 'person-plus', tone: 'mint', v: r.baru, l: 'Siswa baru' }), kpi({ ikon: 'pencil-square', tone: 'lav', v: r.ubah, l: 'Diperbarui', s: r.kelas ? `${r.kelas} masuk kelas` : '' }),
+    kpi({ ikon: 'dash-circle', tone: 'butter', v: r.sama + r.lewati, l: 'Tanpa perubahan \x2f dilewati' }), kpi({ ikon: r.galat ? 'exclamation-triangle' : 'shield-check', tone: r.galat ? 'danger' : 'mint', v: r.galat, l: 'Baris galat', sCls: r.galat ? 'c-err' : 'c-ok', s: r.galat ? 'Tidak disimpan' : 'Semua baris valid' })].join('');
+}
+function wzLangkah3() {
+  const W = S.ui.W, d = W.uji, r = d.ringkas, n = r.baru + r.ubah;
+  $('#wzIsi').innerHTML = `<div class="g c4 mb3">${wzKpi(r)}<\x2fdiv>
+    ${r.galat ? `<div class="al al-warn mb3">${ic('exclamation-triangle')}<div><b>${r.galat} baris galat tidak akan disimpan.<\x2fb> Perbaiki di Excel lalu unggah ulang, atau simpan baris yang valid sekarang. Unduh laporan untuk melihat alasannya.<\x2fdiv><\x2fdiv>` : ''}
+    <div class="card p0"><div class="card-h" style="padding:16px 20px 0;flex-wrap:wrap;gap:10px"><div class="seg">${[['semua', 'Semua', d.baris.length], ['baru', 'Baru', r.baru], ['ubah', 'Diperbarui', r.ubah], ['sama', 'Tanpa perubahan', r.sama], ['lewati', 'Dilewati', r.lewati], ['galat', 'Galat', r.galat]]
+      .filter(x => x[0] === 'semua' || x[2]).map(x => `<button class="${(W.filter || 'semua') === x[0] ? 'aktif' : ''}" data-aksi="wzFilter" data-f="${x[0]}">${x[1]} (${x[2]})<\x2fbutton>`).join('')}<\x2fdiv>
+      <button class="btn btn-sm btn-out" data-aksi="wzLaporan">${ic('download')} Unduh laporan<\x2fbutton><\x2fdiv><div id="wzTabel"><\x2fdiv><\x2fdiv>
+    <div class="row between mt3"><button class="btn btn-out" data-aksi="wzKeAtur">${ic('arrow-left')} Ubah pengaturan<\x2fbutton><button class="btn btn-lime" data-aksi="wzSimpan" ${n ? '' : 'disabled'}>${ic('cloud-check')} ${n ? `Simpan ${n} siswa` : 'Tidak ada yang perlu disimpan'}<\x2fbutton><\x2fdiv>`;
+  wzTabel(d);
+}
+function wzLangkah4() {
+  const W = S.ui.W, r = W.hasil.ringkas;
+  $('#wzIsi').innerHTML = `<div class="card"><div class="center" style="padding:16px 10px 6px"><div class="c-ok" style="font-size:44px">${ic('check2-circle')}<\x2fdiv><h2 class="mt2">Impor selesai<\x2fh2><p class="muted">${h(W.hasilPesan || '')}<\x2fp><\x2fdiv>
+    <div class="g c4 mt2">${wzKpi(r)}<\x2fdiv>
+    <div class="row mt3" style="gap:10px;justify-content:center;flex-wrap:wrap"><button class="btn btn-dark" data-aksi="buka" data-hal="siswa">${ic('people')} Buka Data Siswa<\x2fbutton><button class="btn btn-out" data-aksi="buka" data-hal="identitas">${ic('person-vcard')} Identitas Rapor<\x2fbutton><button class="btn btn-out" data-aksi="wzLaporan">${ic('download')} Unduh laporan<\x2fbutton><button class="btn btn-out" data-aksi="wzBaru">${ic('arrow-repeat')} Impor berkas lain<\x2fbutton><\x2fdiv><\x2fdiv>
+    <div class="card p0 mt3"><div id="wzTabel"><\x2fdiv><\x2fdiv>`;
+  W.filter = 'semua'; wzTabel(W.hasil);
+}
+Object.assign(AKSI, {
+  wzUlang() { S.ui.W = { langkah: 1 }; renderImporSiswa(); },
+  wzBaru() { S.ui.W = { langkah: 1 }; renderImporSiswa(); },
+  wzKeAtur() { S.ui.W.langkah = 2; renderImporSiswa(); },
+  wzFilter(t) { S.ui.W.filter = t.dataset.f; wzLangkah3(); },
+  async wzPeriksa(t) {
+    wzBacaOpsi();
+    const W = S.ui.W;
+    if (!W.opsi.bidang.length && !W.opsi.identitas.length && !Object.values(W.opsi.kelas).some(Boolean)) { toast('Pilih minimal satu data yang akan diisi.', 'warn'); return; }
+    await proses(t, async () => {
+      try { W.uji = await Api.ambil('imporSiswaDapodik', dpkBaris(W), Object.assign(wzOpsiServer(W), { uji: true })); W.langkah = 3; W.filter = 'semua'; renderImporSiswa(); } catch (e) { galat(e); }
+    }, 'Memeriksa\u2026');
+  },
+  async wzSimpan(t) {
+    const W = S.ui.W, r = W.uji.ringkas;
+    if (!(await konfirmasi({ judul: 'Simpan hasil impor?', pesan: `${r.baru} siswa baru dan ${r.ubah} siswa diperbarui akan disimpan.${r.galat ? ` ${r.galat} baris galat dilewati.` : ''}`, ya: 'Simpan' }))) return;
+    await proses(t, async () => {
+      try {
+        const x = await Api.panggil('imporSiswaDapodik', dpkBaris(W), Object.assign(wzOpsiServer(W), { uji: false }));
+        if (!x.ok) throw new ApiGalat(x);
+        W.hasil = x.data; W.hasilPesan = x.pesan; W.langkah = 4;
+        await segarkanBoot(); segarMaster(); Cache.hapus('ihtml_');
+        renderImporSiswa(); toast(x.pesan);
+      } catch (e) { galat(e); }
+    }, 'Menyimpan\u2026');
+  },
+  wzLaporan() {
+    const W = S.ui.W, d = W.hasil || W.uji;
+    if (!d) return;
+    unduhBlob(buatXlsx([{ nama: 'Laporan', judul: true, lebar: [8, 14, 34, 16, 80], baris: [['Baris', 'NISN', 'Nama', 'Status', 'Rincian']]
+      .concat(d.baris.map(x => [x.baris, x.nisn, x.nama, WZ_STATUS[x.status][0], x.status === 'galat' ? x.alasan : (x.perubahan || []).concat(x.catatan ? [x.catatan] : []).join('; ')])) }]),
+      (d.disimpan ? 'Hasil' : 'Pemeriksaan') + '_Impor_Siswa.xlsx');
+  },
+  wzTemplat() {
+    const atas = [], bawah = [], gabung = [];
+    DPK_TEMPLAT.forEach(x => {
+      const c = atas.length;
+      if (Array.isArray(x)) { DPK_SUB.forEach((sub, i) => { atas.push(i ? '' : x[0]); bawah.push(sub); }); gabung.push(dpkHuruf(c) + '1:' + dpkHuruf(c + 5) + '1'); }
+      else { atas.push(x); bawah.push(''); gabung.push(dpkHuruf(c) + '1:' + dpkHuruf(c) + '2'); }
+    });
+    const petunjuk = [['Kolom', 'Keterangan'], ['Sumber', 'Format sama dengan ekspor Dapodik "Daftar Peserta Didik". Berkas ekspor Dapodik bisa langsung diunggah tanpa diubah.'],
+      ['Wajib', 'NISN (10 digit), Nama, Jenis Kelamin (L/P) untuk siswa baru. Kolom lain boleh kosong.'], ['Tanggal Lahir', 'yyyy-mm-dd (mis. 2008-07-21), dd/mm/yyyy, atau sel bertipe tanggal.'],
+      ['Rombel Saat Ini', 'Nama rombel, mis. X TKR 1. Di wizard, setiap rombel dipetakan ke kelas aplikasi.'], ['Dipakai aplikasi', 'Nama, NIPD, Jenis Kelamin, NISN, Tempat/Tanggal Lahir, Agama, Alamat (+RT, RW, Dusun, Kelurahan, Kecamatan, Kode Pos), HP/Telepon, E-Mail, SKHUN, Data Ayah/Ibu/Wali (Nama, Pekerjaan), Rombel Saat Ini, No Seri Ijazah, Sekolah Asal, Anak ke-berapa.'],
+      ['Kolom lain', 'Boleh tetap ada; diabaikan oleh wizard.']];
+    unduhBlob(buatXlsx([{ nama: 'Daftar Peserta Didik', judulBaris: 2, gabung, lebar: atas.map((x, i) => (i === 0 ? 5 : i === 1 ? 30 : 16)), baris: [atas, bawah] },
+      { nama: 'Petunjuk', judul: true, lebar: [18, 120], baris: petunjuk }]), 'Templat_Data_Siswa_Dapodik.xlsx');
   }
 });
 
@@ -4381,9 +4629,13 @@ function buatXlsx(sheets) {
   const NS = 'http:\x2f\x2fschemas.openxmlformats.org\x2f', H = '\x3c?xml version="1.0" encoding="UTF-8" standalone="yes"?\x3e';
   const kol = i => { let s = ''; for (i++; i; i = Math.floor((i - 1) / 26)) s = String.fromCharCode(65 + ((i - 1) % 26)) + s; return s; };
   const sel = (v, ref, gaya) => (typeof v === 'number' && isFinite(v) ? `<c r="${ref}"${gaya}><v>${v}<\x2fv><\x2fc>` : `<c r="${ref}" t="inlineStr"${gaya}><is><t xml:space="preserve">${escXml(v)}<\x2ft><\x2fis><\x2fc>`);
-  const lembar = sh => `${H}<worksheet xmlns="${NS}spreadsheetml\x2f2006\x2fmain">${sh.judul ? '<sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"\x2f><\x2fsheetView><\x2fsheetViews>' : ''}`
-    + `${sh.lebar ? '<cols>' + sh.lebar.map((w, i) => `<col min="${i + 1}" max="${i + 1}" width="${w}" customWidth="1"\x2f>`).join('') + '<\x2fcols>' : ''}`
-    + `<sheetData>${sh.baris.map((r, i) => `<row r="${i + 1}">${r.map((v, j) => (v === '' || v == null ? '' : sel(v, kol(j) + (i + 1), i === 0 && sh.judul ? ' s="1"' : ''))).join('')}<\x2frow>`).join('')}<\x2fsheetData><\x2fworksheet>`;
+  const lembar = sh => {
+    const jb = sh.judulBaris || (sh.judul ? 1 : 0);
+    return `${H}<worksheet xmlns="${NS}spreadsheetml\x2f2006\x2fmain">${jb ? `<sheetViews><sheetView workbookViewId="0"><pane ySplit="${jb}" topLeftCell="A${jb + 1}" activePane="bottomLeft" state="frozen"\x2f><\x2fsheetView><\x2fsheetViews>` : ''}`
+      + `${sh.lebar ? '<cols>' + sh.lebar.map((w, i) => `<col min="${i + 1}" max="${i + 1}" width="${w}" customWidth="1"\x2f>`).join('') + '<\x2fcols>' : ''}`
+      + `<sheetData>${sh.baris.map((r, i) => `<row r="${i + 1}">${r.map((v, j) => (v === '' || v == null ? '' : sel(v, kol(j) + (i + 1), i < jb ? ' s="1"' : ''))).join('')}<\x2frow>`).join('')}<\x2fsheetData>`
+      + `${sh.gabung && sh.gabung.length ? `<mergeCells count="${sh.gabung.length}">${sh.gabung.map(g => `<mergeCell ref="${g}"\x2f>`).join('')}<\x2fmergeCells>` : ''}<\x2fworksheet>`;
+  };
   const gaya = `${H}<styleSheet xmlns="${NS}spreadsheetml\x2f2006\x2fmain"><fonts count="2"><font><sz val="11"\x2f><name val="Calibri"\x2f><\x2ffont><font><b\x2f><sz val="11"\x2f><name val="Calibri"\x2f><\x2ffont><\x2ffonts>`
     + '<fills count="3"><fill><patternFill patternType="none"\x2f><\x2ffill><fill><patternFill patternType="gray125"\x2f><\x2ffill><fill><patternFill patternType="solid"><fgColor rgb="FFE6F4C4"\x2f><bgColor indexed="64"\x2f><\x2fpatternFill><\x2ffill><\x2ffills>'
     + '<borders count="1"><border><left\x2f><right\x2f><top\x2f><bottom\x2f><diagonal\x2f><\x2fborder><\x2fborders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"\x2f><\x2fcellStyleXfs>'
@@ -4670,7 +4922,7 @@ function mulaiAplikasi() {
   const beda = berkasBeda(awal);
   $('#ikonTema').className = 'bi bi-' + (document.documentElement.dataset.theme === 'dark' ? 'sun' : 'moon-stars');
   $$('.js-sekolah').forEach(e => { e.textContent = awal.sekolah || 'SMK Muhammadiyah 1 Sangatta'; });
-  $$('.js-app').forEach(e => { e.textContent = awal.app || 'Erapor SMK'; });
+  $$('.js-app').forEach(e => { e.textContent = awal.app || 'RaporMu'; });
   $$('.js-appsub').forEach(e => { e.textContent = awal.appSub || awal.sekolah || ''; });
   $$('.js-ta').forEach(e => { e.textContent = awal.ta || '\u2014'; });
   $$('.js-periode').forEach(e => { e.textContent = 'Semester ' + (awal.sem || 'Ganjil'); });
