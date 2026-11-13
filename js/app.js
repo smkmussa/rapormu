@@ -1,6 +1,6 @@
 'use strict';
 
-const VERSI_KLIEN = '2.6.5';
+const VERSI_KLIEN = '2.7.1';
 
 
 
@@ -186,6 +186,8 @@ const Api = {
     for (let i = 0; ; i++) {
       try {
         const r = await server(fn, a);
+        if (r && r.ok === false && r.kode === 'TIDAK_ADA' && r.pesan === 'Fungsi tidak dikenal.')
+          r.pesan = `Server Apps Script belum memuat fitur ini (fungsi "${fn}"): tampilan sudah versi baru, tetapi server yang aktif masih versi lama. Super Admin: salin berkas terbaru ke Apps Script, simpan, lalu Terapkan \u2192 Kelola deployment \u2192 Edit (ikon pensil) \u2192 Versi: Versi baru \u2192 Terapkan.`;
         if (r && r.tokenBaru) Sesi.set(r.tokenBaru);
         if (r && r.ok === false && r.kode === 'SESI') Sesi.habis(r.pesan);
         return r || { ok: false, pesan: 'Respons kosong dari server.' };
@@ -1987,6 +1989,51 @@ async function idnMuatLogo() {
   img.style.cssText = 'max-width:100%;max-height:100%';
   kotak.appendChild(img);
 }
+function idnCfgDariForm() {
+  const I = S.ui.I, v = id => ($('#' + id) || {}).value || '', label = {}, sembunyi = [];
+  $$('.idnLbl').forEach(x => { const b = I.d.bidang.find(y => y.k === x.dataset.k), isi = x.value.trim(); if (b && isi && isi !== b.labelAwal) label[b.k] = isi; });
+  $$('.idnTampil').forEach(x => { if (!x.checked) sembunyi.push(x.dataset.k); });
+  const angkaAtau = (x, d) => { const n = parseFloat(String(x).replace(',', '.')); return isFinite(n) ? n : d; }, margin = {};
+  $$('.idnMg').forEach(x => { (margin[x.dataset.h] = margin[x.dataset.h] || {})[x.dataset.s] = angkaAtau(x.value, I.d.cfg.margin[x.dataset.h][x.dataset.s]); });
+  const cfg = {
+    sampul: { atas: v('ia_sampul_atas'), labelNama: v('ia_sampul_labelNama'), labelNisn: v('ia_sampul_labelNisn'), bawah: v('ia_sampul_bawah'), logo: !!($('#ia_sampul_logo') || {}).checked, logoCm: angkaAtau(v('ia_sampul_logoCm'), I.d.cfg.sampul.logoCm) },
+    margin,
+    sekolah: { judul: v('ia_sekolah_judul'), rincian: v('ia_sekolah_rincian') },
+    siswa: { judul: v('ia_siswa_judul'), kosong: v('ia_siswa_kosong'), foto: v('ia_siswa_foto'), tempatTanggal: v('ia_siswa_tempatTanggal').trim(), jabatan: v('ia_siswa_jabatan').trim(), nama: v('ia_siswa_nama').trim(), nomor: v('ia_siswa_nomor').trim(), label, sembunyi }
+  };
+  const tabel = {};
+  $$('.idnTb').forEach(x => { tabel[x.dataset.k] = angkaAtau(x.value, (I.d.cfg.tabel || {})[x.dataset.k]); });
+  cfg.tabel = tabel;
+  return cfg;
+}
+const IDN_TABEL = [['ukuran', 'Ukuran huruf (pt)', 7, 14, 0.5, ''], ['judul', 'Ukuran judul (pt)', 8, 20, 0.5, ''], ['jarak', 'Jarak antarbaris (pt)', 0, 8, 0.2, 'Ruang di atas & bawah tiap baris'],
+  ['tinggi', 'Tinggi baris', 1, 2, 0.05, '1 = rapat \u00b7 1,5 = longgar'], ['no', 'Lebar kolom nomor (cm)', 0.3, 2, 0.1, ''], ['label', 'Lebar kolom label (cm)', 2, 12, 0.1, 'Kolom isi mendapat sisa lebar halaman'],
+  ['titik', 'Lebar kolom titik dua (cm)', 0.2, 1.2, 0.05, ''], ['inden', 'Inden isian a., b. (cm)', 0, 4, 0.05, ''], ['sub', 'Inden baris tambahan (cm)', 0, 6, 0.05, 'Mis. Nomor Telepon, Alamat email']];
+let idnPrevT = null, idnPrevNo = 0;
+function idnJadwalPratinjau() { clearTimeout(idnPrevT); idnPrevT = setTimeout(idnPratinjauLangsung, 900); }
+async function idnPratinjauLangsung() {
+  const I = S.ui.I, box = $('#idnPrevBox'), sel = $('#idnPrevSiswa');
+  if (!I || !box) return;
+  const id = sel ? sel.value : '';
+  if (!id) { box.innerHTML = `<div class="xs muted" style="padding:16px">Belum ada siswa di kelas ini.<\x2fdiv>`; return; }
+  I.prevSiswa = id;
+  const no = ++idnPrevNo;
+  try {
+    const d = await Api.ambil('buatRaporPdf', I.id, id, { format: 'html', jenis: 'identitas', halaman: ['siswa'], cfgIdentitas: idnCfgDariForm() });
+    if (no !== idnPrevNo || !document.body.contains(box)) return;
+    const fr = document.createElement('iframe');
+    fr.title = 'Pratinjau tata letak Identitas Peserta Didik';
+    fr.style.cssText = 'position:absolute;top:0;left:0;width:840px;height:1200px;border:0;transform-origin:0 0;background:#e9e8ef';
+    fr.addEventListener('load', () => {
+      try { const tinggi = fr.contentDocument.documentElement.scrollHeight, sk = box.clientWidth / 840; fr.style.height = tinggi + 'px'; fr.style.transform = `scale(${sk})`; box.style.height = Math.ceil(tinggi * sk) + 'px'; } catch (e) {   }
+    });
+    box.innerHTML = '';
+    box.appendChild(fr);
+    fr.srcdoc = d.html;
+  } catch (e) {
+    if (no === idnPrevNo && document.body.contains(box)) box.innerHTML = `<div class="al al-err" style="margin:12px">${ic('exclamation-triangle')}<div>${h(e.message || 'Pratinjau gagal dimuat.')}<\x2fdiv><\x2fdiv>`;
+  }
+}
 function renderIdnAtur(cfgPakai) {
   const I = S.ui.I, d = I.d, c = cfgPakai || d.cfg, o = d.otomatis;
   const ta = (id, v, r, pl) => `<textarea class="in" id="${id}" rows="${r}"${pl ? ` placeholder="${h(pl)}"` : ''}>${h(v)}<\x2ftextarea>`;
@@ -2023,11 +2070,20 @@ function renderIdnAtur(cfgPakai) {
       <div class="g c2">${f('Jabatan penanda tangan', ta('ia_siswa_jabatan', c.siswa.jabatan, 2, o.jabatan), 'Kosongkan = ikut Pengaturan.')}<div class="g c2">${f('Nama', inp('ia_siswa_nama', c.siswa.nama, o.nama), 'Kosongkan = kepala sekolah di Pengaturan.')}${f('Nomor', inp('ia_siswa_nomor', c.siswa.nomor, o.nomor))}<\x2fdiv><\x2fdiv>
       <h4 class="mt3 mb2">Isian dan labelnya<\x2fh4><p class="xs muted mb2">Ubah label sesuai format sekolah. Hapus centang <b>Cetak<\x2fb> untuk menyembunyikan isian; isian a., b., dan baris tambahan di bawahnya ikut tersembunyi. Nomor urut menyesuaikan otomatis.<\x2fp>
       <div class="tw"><table class="tbl"><thead><tr><th style="width:64px">No<\x2fth><th>Label<\x2fth><th style="width:70px;text-align:center">Cetak<\x2fth><th style="width:110px">Sumber data<\x2fth><\x2ftr><\x2fthead><tbody>${baris}<\x2ftbody><\x2ftable><\x2fdiv><\x2fdiv>
+    <div class="card mt3"><div class="row between" style="align-items:center;flex-wrap:wrap;gap:8px"><h3>Tata letak tabel Identitas Peserta Didik<\x2fh3><span class="xs muted">Pratinjau berubah otomatis \u00b7 klik <b>Simpan pengaturan<\x2fb> agar berlaku<\x2fspan><\x2fdiv>
+      <div class="g c2 mt2" style="align-items:start">
+        <div><div class="g c2">${IDN_TABEL.map(x => f(x[1], `<input class="in idnTb" type="number" data-k="${x[0]}" min="${x[2]}" max="${x[3]}" step="${x[4]}" value="${(c.tabel || {})[x[0]] ?? ''}" aria-label="${x[1]}">`, x[5])).join('')}<\x2fdiv>
+          <button class="btn btn-sm btn-out mt2" data-aksi="idnTbAwal">${ic('arrow-counterclockwise')} Tata letak bawaan<\x2fbutton>
+          <p class="xs muted mt2">Isi yang panjang (mis. alamat) membuat baris turun dan tabel tampak renggang: perkecil <b>lebar kolom label<\x2fb> atau <b>ukuran huruf<\x2fb> sampai isinya muat. Garis merah di pratinjau berarti isi melebihi satu halaman.<\x2fp><\x2fdiv>
+        <div><div class="row between mb1" style="align-items:center;gap:8px"><select class="in" id="idnPrevSiswa" style="max-width:280px" aria-label="Siswa untuk pratinjau">${opsi(I.baris.map(b => [b.id_siswa, b.nama]), I.prevSiswa || (I.baris[0] || {}).id_siswa || '')}<\x2fselect><button class="btn btn-sm btn-out" data-aksi="idnPrevSegar">${ic('arrow-clockwise')} Segarkan<\x2fbutton><\x2fdiv>
+          <div id="idnPrevBox" style="position:relative;overflow:hidden;border-radius:12px;background:#e9e8ef;min-height:140px"><div class="xs muted" style="padding:16px">Memuat pratinjau\u2026<\x2fdiv><\x2fdiv>
+          <div class="xs muted mt1">Pilih siswa dengan alamat terpanjang untuk menguji tata letak.<\x2fdiv><\x2fdiv><\x2fdiv><\x2fdiv>
     <div class="card mt3"><h3 class="mb2">Margin tiap lembar (cm)<\x2fh3><p class="xs muted mb2">Terpisah dari margin rapor. Ukuran kertas dan jenis huruf tetap mengikuti menu Tata Cetak Rapor. Bila isi sebuah lembar melebihi satu halaman, pratinjau menandainya dengan garis merah.<\x2fp>
       <div class="tw"><table class="tbl"><thead><tr><th>Lembar<\x2fth><th>Atas<\x2fth><th>Bawah<\x2fth><th>Kiri<\x2fth><th>Kanan<\x2fth><\x2ftr><\x2fthead><tbody>${ID_HAL.map(x => `<tr><td><b>${x[1]}<\x2fb><\x2ftd>${['atas', 'bawah', 'kiri', 'kanan'].map(sisi => `<td><input class="in idnMg" type="number" min="0" max="8" step="0.1" data-h="${x[0]}" data-s="${sisi}" value="${c.margin[x[0]][sisi]}" style="width:92px" aria-label="Margin ${sisi} ${x[1]}"><\x2ftd>`).join('')}<\x2ftr>`).join('')}<\x2ftbody><\x2ftable><\x2fdiv><\x2fdiv>`;
   idnMuatLogo();
-  $('#idnIsi').addEventListener('input', () => { if (S.ui.I && S.ui.I.tab === 'atur') { S.ui.I.aturKotor = true; tandaiIdn(); } });
-  $('#idnIsi').addEventListener('change', () => { if (S.ui.I && S.ui.I.tab === 'atur') { S.ui.I.aturKotor = true; tandaiIdn(); } });
+  idnPratinjauLangsung();
+  $('#idnIsi').addEventListener('input', e => { if (S.ui.I && S.ui.I.tab === 'atur') { if (e.target.id !== 'idnPrevSiswa') { S.ui.I.aturKotor = true; tandaiIdn(); } idnJadwalPratinjau(); } });
+  $('#idnIsi').addEventListener('change', e => { if (S.ui.I && S.ui.I.tab === 'atur') { if (e.target.id !== 'idnPrevSiswa') { S.ui.I.aturKotor = true; tandaiIdn(); } idnJadwalPratinjau(); } });
 }
 Object.assign(AKSI, {
   tabIdentitas(t) { S.ui.tabIdentitas = S.ui.I.tab = t.dataset.t; renderIdentitas($('#pg-identitas')); },
@@ -2091,19 +2147,16 @@ Object.assign(AKSI, {
       } catch (e) { galat(e); }
     }, 'Menghapus\u2026');
   },
+  idnTbAwal() {
+    const a = S.ui.I.d.cfgAwal.tabel || {};
+    $$('.idnTb').forEach(x => { x.value = a[x.dataset.k]; });
+    S.ui.I.aturKotor = true; tandaiIdn(); idnPratinjauLangsung();
+    toast('Tata letak bawaan dimuat. Klik Simpan pengaturan untuk menerapkan.', 'info', 6000);
+  },
+  idnPrevSegar() { idnPratinjauLangsung(); },
   idnAturAwal() { renderIdnAtur(S.ui.I.d.cfgAwal); S.ui.I.aturKotor = true; tandaiIdn(); toast('Teks bawaan dimuat. Klik Simpan pengaturan untuk menerapkan.', 'info', 6000); },
   async idnAturSimpan(t) {
-    const I = S.ui.I, v = id => ($('#' + id) || {}).value || '', label = {}, sembunyi = [];
-    $$('.idnLbl').forEach(x => { const b = I.d.bidang.find(y => y.k === x.dataset.k), isi = x.value.trim(); if (b && isi && isi !== b.labelAwal) label[b.k] = isi; });
-    $$('.idnTampil').forEach(x => { if (!x.checked) sembunyi.push(x.dataset.k); });
-    const angkaAtau = (x, d) => { const n = parseFloat(String(x).replace(',', '.')); return isFinite(n) ? n : d; }, margin = {};
-    $$('.idnMg').forEach(x => { (margin[x.dataset.h] = margin[x.dataset.h] || {})[x.dataset.s] = angkaAtau(x.value, I.d.cfg.margin[x.dataset.h][x.dataset.s]); });
-    const cfg = {
-      sampul: { atas: v('ia_sampul_atas'), labelNama: v('ia_sampul_labelNama'), labelNisn: v('ia_sampul_labelNisn'), bawah: v('ia_sampul_bawah'), logo: !!($('#ia_sampul_logo') || {}).checked, logoCm: angkaAtau(v('ia_sampul_logoCm'), I.d.cfg.sampul.logoCm) },
-      margin,
-      sekolah: { judul: v('ia_sekolah_judul'), rincian: v('ia_sekolah_rincian') },
-      siswa: { judul: v('ia_siswa_judul'), kosong: v('ia_siswa_kosong'), foto: v('ia_siswa_foto'), tempatTanggal: v('ia_siswa_tempatTanggal').trim(), jabatan: v('ia_siswa_jabatan').trim(), nama: v('ia_siswa_nama').trim(), nomor: v('ia_siswa_nomor').trim(), label, sembunyi }
-    };
+    const I = S.ui.I, cfg = idnCfgDariForm();
     await proses(t, async () => {
       try {
         const r = await Api.panggil('simpanData', 'pengaturan', { identitas_json: JSON.stringify(cfg) });
@@ -4938,7 +4991,10 @@ function mulaiAplikasi() {
   muatAplikasi().then(() => peringatkanBerkas()).catch(e => { Sesi.hapus(); tampilLogin(); if (e.kode !== 'SESI') alertLogin('info', e.message); }).finally(() => { $('#boot').hidden = true; });
 }
 
-function berkasBeda() { return []; }
+function berkasBeda(awal) {
+  const srv = (awal && awal.berkas) || (awal && awal.versi ? { 'Kode.gs': awal.versi } : {});
+  return Object.keys(srv).filter(f => srv[f] !== VERSI_KLIEN).map(f => f + ' (server ' + srv[f] + ')');
+}
 function peringatkanBerkas() {
   if (!S.berkasBeda || !S.berkasBeda.length) return;
   const pesan = `Berkas belum seragam dengan versi ${VERSI_KLIEN}: ${S.berkasBeda.join(', ')} masih versi lama atau tidak lengkap. Super Admin: salin ulang berkas tersebut dari paket terbaru, simpan, lalu Terapkan \u2192 Kelola deployment \u2192 Edit \u2192 Versi baru.`;
