@@ -448,4 +448,4 @@ kbd{font-family:var(--mono);font-size:11.5px;background:var(--card);border:1px s
 }
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
 
-:root{--erapor-versi:"2.6.5"}
+:root{--erapor-versi:"2.7.1"}
